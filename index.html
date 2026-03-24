@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SatZap">
+<meta name="theme-color" content="#06080f">
+<meta name="description" content="See what's zapping on Earth">
+<title>SatZap</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#06080f}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;color:#fff;overscroll-behavior:none}
+#app{width:100vw;height:100dvh;position:relative;overflow:hidden}
+
+#map{position:absolute;inset:0;z-index:1}
+.leaflet-container{background:#06080f!important}
+.leaflet-tile-pane{filter:saturate(.65) brightness(.5) hue-rotate(195deg)}
+.leaflet-control-zoom{display:none}
+.leaflet-control-attribution{font-size:8px!important;opacity:.3;background:rgba(0,0,0,.4)!important;color:rgba(255,255,255,.4)!important;padding:2px 5px!important}
+.leaflet-control-attribution a{color:rgba(255,255,255,.4)!important}
+
+.zap-bubble{border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid rgba(255,255,255,.22);overflow:hidden;position:relative;transition:transform .12s}
+.zap-bubble:active{transform:scale(.94)}
+.zb-icon{font-size:13px;line-height:1;pointer-events:none}
+.zb-likes{font-size:7px;font-weight:800;color:#f7c217;margin-top:1px;pointer-events:none}
+.zb-text{font-size:7px;font-weight:500;color:rgba(255,255,255,.9);text-align:center;line-height:1.2;padding:0 3px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;pointer-events:none}
+.zpulse{position:absolute;border-radius:50%;border:1.5px solid;opacity:0;width:120%;height:120%;top:-10%;left:-10%;pointer-events:none;animation:zpo 2.4s ease-out infinite}
+@keyframes zpo{0%{opacity:.5;width:108%;height:108%;top:-4%;left:-4%}100%{opacity:0;width:195%;height:195%;top:-47%;left:-47%}}
+
+#topbar{position:absolute;top:0;left:0;right:0;z-index:10;padding:env(safe-area-inset-top,12px) 15px 0;background:linear-gradient(180deg,rgba(6,8,15,.95) 0%,transparent 100%);pointer-events:none}
+#topbar-inner{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px}
+#logo{font-size:22px;font-weight:800;letter-spacing:-1px;pointer-events:all}
+#logo span{color:#f7c217}
+.tagline{font-size:10px;color:rgba(255,255,255,.35);letter-spacing:.5px}
+#userpill{display:flex;align-items:center;gap:7px;background:rgba(6,8,15,.8);border:0.5px solid rgba(255,255,255,.18);border-radius:22px;padding:6px 13px;font-size:12px;cursor:pointer;pointer-events:all;min-height:44px}
+.ava{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#000;flex-shrink:0}
+
+#trendbar{position:absolute;top:calc(env(safe-area-inset-top,12px) + 54px);left:0;right:0;padding:0 14px;display:flex;gap:7px;overflow-x:auto;z-index:10;scrollbar-width:none}
+#trendbar::-webkit-scrollbar{display:none}
+.tpill{flex-shrink:0;background:rgba(6,8,15,.78);border:0.5px solid rgba(255,255,255,.14);border-radius:22px;padding:7px 13px;font-size:12px;color:rgba(255,255,255,.6);cursor:pointer;white-space:nowrap;min-height:36px;display:flex;align-items:center}
+.tpill.active{background:rgba(247,194,23,.12);border-color:rgba(247,194,23,.38);color:#f7c217}
+
+#statsbar{position:absolute;left:12px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px;z-index:10}
+.sc{background:rgba(6,8,15,.78);border:0.5px solid rgba(255,255,255,.1);border-radius:11px;padding:8px 10px;text-align:center;min-width:54px}
+.sv{font-size:13px;font-weight:700;color:#f7c217}
+.sl{font-size:9px;color:rgba(255,255,255,.3);margin-top:2px}
+
+#bottombar{position:absolute;bottom:0;left:0;right:0;z-index:10;padding:10px 14px calc(env(safe-area-inset-bottom,16px) + 6px);background:linear-gradient(0deg,rgba(6,8,15,.96) 0%,transparent 100%)}
+#locrow{display:flex;align-items:center;gap:6px;margin-bottom:8px;padding-left:2px}
+.locpin{width:8px;height:8px;background:#f7c217;border-radius:50% 50% 50% 0;transform:rotate(-45deg);flex-shrink:0}
+#loctext{font-size:11px;color:rgba(255,255,255,.35)}
+#composer{display:flex;gap:8px;align-items:center}
+#custbtn{width:44px;height:44px;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;flex-shrink:0}
+#postinput{flex:1;background:rgba(255,255,255,.08);border:0.5px solid rgba(255,255,255,.18);border-radius:22px;padding:11px 16px;color:#fff;font-size:16px;outline:none;font-family:inherit;resize:none;height:44px;line-height:1.2;-webkit-appearance:none}
+#postinput::placeholder{color:rgba(255,255,255,.28)}
+#postinput:focus{border-color:rgba(247,194,23,.5);background:rgba(255,255,255,.1)}
+#zapbtn{width:44px;height:44px;background:#f7c217;border:none;border-radius:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#zapbtn:active{transform:scale(.93);background:#ffe040}
+#charlimit{font-size:10px;color:rgba(255,255,255,.2);text-align:right;margin-top:5px}
+
+#toast{position:absolute;top:42%;left:50%;transform:translate(-50%,-50%) scale(.88);background:rgba(247,194,23,.13);border:0.5px solid rgba(247,194,23,.38);border-radius:16px;padding:12px 22px;font-size:14px;font-weight:600;color:#f7c217;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;z-index:60;white-space:nowrap}
+#toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+/* SHEETS */
+.sheet-bg{position:absolute;inset:0;background:rgba(0,0,0,.65);z-index:50;opacity:0;pointer-events:none;transition:opacity .24s}
+.sheet-bg.open{opacity:1;pointer-events:all}
+.sheet{background:#0d1117;border:0.5px solid rgba(255,255,255,.12);border-radius:24px 24px 0 0;position:absolute;bottom:0;left:0;right:0;max-height:88vh;overflow-y:auto;transform:translateY(100%);transition:transform .28s cubic-bezier(.32,.72,0,1);padding-bottom:env(safe-area-inset-bottom,20px)}
+.sheet.open{transform:translateY(0)}
+.sheet-handle{width:36px;height:4px;background:rgba(255,255,255,.18);border-radius:2px;margin:12px auto 0}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 4px}
+.sheet-head h3{font-size:17px;font-weight:700}
+.sh-close{width:32px;height:32px;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.13);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;color:rgba(255,255,255,.55);flex-shrink:0}
+
+/* ZAP SHEET */
+.zpreview{background:rgba(255,255,255,.05);border:0.5px solid rgba(255,255,255,.1);border-radius:13px;padding:13px;margin:14px 20px;font-size:14px;color:rgba(255,255,255,.82);line-height:1.5}
+.zauth{font-size:12px;color:rgba(255,255,255,.35);padding:0 20px;margin-bottom:14px}
+.like-section{padding:0 20px 16px;display:flex;flex-direction:column;align-items:center;gap:14px}
+#like-big-btn{width:80px;height:80px;background:rgba(255,107,107,.12);border:1.5px solid rgba(255,107,107,.35);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:transform .12s,background .15s;font-size:30px}
+#like-big-btn:active{transform:scale(.88);background:rgba(255,107,107,.28)}
+#like-count-display{font-size:15px;font-weight:700;color:#fff}
+#like-count-display span{color:#ff6b6b}
+.quick-likes{display:flex;gap:8px}
+.ql-btn{background:rgba(255,107,107,.1);border:0.5px solid rgba(255,107,107,.25);border-radius:22px;padding:9px 16px;font-size:13px;font-weight:700;color:#ff6b6b;cursor:pointer;min-height:44px;display:flex;align-items:center}
+.ql-btn:active{background:rgba(255,107,107,.25)}
+#close-zap-sheet{width:calc(100% - 40px);margin:0 20px 8px;background:#ff6b6b;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit}
+#close-zap-sheet:active{background:#ff4444}
+
+/* PROFILE SHEET */
+.profile-hero{padding:0 20px 0}
+.ph-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px}
+.ph-ava{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#000;border:3px solid #0d1117}
+.ph-name{font-size:19px;font-weight:800;letter-spacing:-.4px}
+.ph-handle{font-size:13px;color:rgba(255,255,255,.35);margin-bottom:6px}
+.ph-bio{font-size:13px;color:rgba(255,255,255,.65);line-height:1.55;margin-bottom:16px}
+.ph-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(255,255,255,.07);border-radius:13px;overflow:hidden;margin-bottom:16px}
+.ph-stat{background:#0d1117;padding:11px 4px;text-align:center}
+.ph-sv{font-size:15px;font-weight:700;color:#f7c217}
+.ph-sl{font-size:9px;color:rgba(255,255,255,.28);margin-top:2px}
+.install-banner{background:rgba(247,194,23,.08);border:0.5px solid rgba(247,194,23,.2);border-radius:13px;padding:13px 15px;margin:0 20px 16px;display:flex;align-items:center;gap:10px}
+.ib-icon{font-size:22px;flex-shrink:0}
+.ib-title{font-size:13px;font-weight:600;color:#f7c217}
+.ib-sub{font-size:11px;color:rgba(247,194,23,.45);margin-top:2px}
+.myzap-item{display:flex;gap:11px;padding:12px 20px;border-top:0.5px solid rgba(255,255,255,.06)}
+.mz-bub{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;border:1.5px solid rgba(255,255,255,.12)}
+.mz-text{font-size:13px;color:#fff;line-height:1.4;margin-bottom:4px}
+.mz-meta{font-size:11px;color:rgba(255,255,255,.3);display:flex;gap:8px}
+.mz-likes{color:#ff6b6b;font-weight:700}
+
+/* CUST SHEET */
+.cust-body{padding:0 20px 8px}
+.preview-wrap{display:flex;justify-content:center;margin-bottom:22px}
+#blive{width:90px;height:90px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.2);transition:all .22s;position:relative;overflow:hidden}
+.bpulse{position:absolute;border-radius:50%;border:1.5px solid;opacity:0;width:118%;height:118%;top:-9%;left:-9%;pointer-events:none;animation:bpo 2s ease-out infinite}
+@keyframes bpo{0%{opacity:.45;width:108%;height:108%;top:-4%;left:-4%}100%{opacity:0;width:175%;height:175%;top:-37%;left:-37%}}
+#bli{font-size:24px;line-height:1}
+#blt{font-size:9px;font-weight:600;color:#fff;text-align:center;padding:0 8px;margin-top:3px}
+#bls{font-size:9px;font-weight:800;color:#ff6b6b;margin-top:2px}
+.clabel{font-size:11px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.7px;text-transform:uppercase;margin-bottom:11px}
+.cgrid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px}
+.cdot{width:36px;height:36px;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:all .12s}
+.cdot.sel{border-color:#fff;transform:scale(1.1)}
+.igrid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:20px}
+.iopt{aspect-ratio:1;background:rgba(255,255,255,.06);border:0.5px solid rgba(255,255,255,.1);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;min-height:44px}
+.iopt.sel{background:rgba(255,107,107,.15);border-color:rgba(255,107,107,.45)}
+#cs-save{width:100%;background:#ff6b6b;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;margin-bottom:8px}
+#cs-save:active{background:#ff4444}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="map"></div>
+
+  <div id="topbar">
+    <div id="topbar-inner">
+      <div>
+        <div id="logo">Sat<span>Zap</span></div>
+        <div class="tagline">See what's zapping on Earth</div>
+      </div>
+      <div id="userpill"><div class="ava" id="topava" style="background:#ff6b6b">YO</div><span>@you</span></div>
+    </div>
+  </div>
+
+  <div id="trendbar">
+    <div class="tpill active">⚡ Top</div>
+    <div class="tpill" data-lat="40.71" data-lng="-74.00" data-zoom="12">New York</div>
+    <div class="tpill" data-lat="35.68" data-lng="139.69" data-zoom="12">Tokyo</div>
+    <div class="tpill" data-lat="51.50" data-lng="-0.12" data-zoom="12">London</div>
+    <div class="tpill" data-lat="-22.90" data-lng="-43.17" data-zoom="12">Rio</div>
+    <div class="tpill" data-lat="-1.28" data-lng="36.81" data-zoom="12">Nairobi</div>
+    <div class="tpill" data-lat="48.85" data-lng="2.35" data-zoom="12">Paris</div>
+    <div class="tpill" data-lat="36.97" data-lng="-79.93" data-zoom="13">Near me</div>
+  </div>
+
+  <div id="statsbar">
+    <div class="sc"><div class="sv" id="s-zaps">2,847</div><div class="sl">zaps</div></div>
+    <div class="sc"><div class="sv" id="s-likes">48K</div><div class="sl">likes</div></div>
+    <div class="sc"><div class="sv" id="s-online">891</div><div class="sl">online</div></div>
+  </div>
+
+  <div id="bottombar">
+    <div id="locrow"><div class="locpin"></div><div id="loctext">Tap map to pin · zap anywhere</div></div>
+    <div id="composer">
+      <div id="custbtn">🎨</div>
+      <textarea id="postinput" placeholder="What's zapping...?" maxlength="140"></textarea>
+      <button id="zapbtn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M13 2L4.5 13.5H11L10 22L19.5 10.5H13L13 2Z" fill="#000" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div id="charlimit">0 / 140</div>
+  </div>
+
+  <div id="toast"></div>
+
+  <!-- ZAP SHEET -->
+  <div class="sheet-bg" id="zap-bg">
+    <div class="sheet" id="zap-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h3 id="zs-title">Zap</h3>
+        <div class="sh-close" id="zs-close">✕</div>
+      </div>
+      <div class="zauth" id="zs-auth">@handle</div>
+      <div class="zpreview" id="zs-content">...</div>
+      <div class="like-section">
+        <div id="like-big-btn">❤️</div>
+        <div id="like-count-display">tap to like · <span id="lc-num">0</span> likes</div>
+        <div class="quick-likes">
+          <div class="ql-btn" data-n="5">+5</div>
+          <div class="ql-btn" data-n="10">+10</div>
+          <div class="ql-btn" data-n="50">+50</div>
+          <div class="ql-btn" data-n="100">+100</div>
+        </div>
+      </div>
+      <button id="close-zap-sheet">Done</button>
+    </div>
+  </div>
+
+  <!-- PROFILE SHEET -->
+  <div class="sheet-bg" id="profile-bg">
+    <div class="sheet" id="profile-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h3>Profile</h3>
+        <div class="sh-close" id="ps-close">✕</div>
+      </div>
+      <div class="profile-hero">
+        <div class="ph-row">
+          <div class="ph-ava" id="ph-ava" style="background:#ff6b6b">YO</div>
+        </div>
+        <div class="ph-name">Your Name</div>
+        <div class="ph-handle">@you · joined March 2026</div>
+        <div class="ph-bio">Zapping ideas from Danville, VA. Drop a zap, watch it grow.</div>
+        <div class="ph-stats">
+          <div class="ph-stat"><div class="ph-sv" id="ph-zaps">4</div><div class="ph-sl">zaps</div></div>
+          <div class="ph-stat"><div class="ph-sv" id="ph-likes">0</div><div class="ph-sl">likes got</div></div>
+          <div class="ph-stat"><div class="ph-sv" id="ph-given">0</div><div class="ph-sl">likes given</div></div>
+          <div class="ph-stat"><div class="ph-sv">Danville</div><div class="ph-sl">home</div></div>
+        </div>
+        <div class="install-banner">
+          <div class="ib-icon">📲</div>
+          <div>
+            <div class="ib-title">Add to Home Screen</div>
+            <div class="ib-sub">Tap Share → "Add to Home Screen" to install SatZap</div>
+          </div>
+        </div>
+        <div class="clabel" style="padding:0 20px 10px">Your zaps</div>
+        <div class="myzap-item"><div class="mz-bub" style="background:rgba(255,107,107,.18)">💡</div><div><div class="mz-text">Tipping is broken — likes prove it works</div><div class="mz-meta"><span>📍 Danville</span><span class="mz-likes">❤️ <span id="mz1">0</span></span></div></div></div>
+        <div class="myzap-item"><div class="mz-bub" style="background:rgba(78,205,196,.18)">🎸</div><div><div class="mz-text">Live show tonight — doors at 8pm</div><div class="mz-meta"><span>📍 Danville</span><span class="mz-likes">❤️ <span id="mz2">0</span></span></div></div></div>
+        <div style="height:16px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUST SHEET -->
+  <div class="sheet-bg" id="cust-bg">
+    <div class="sheet" id="cust-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h3>Bubble lab</h3>
+        <div class="sh-close" id="cs-close">✕</div>
+      </div>
+      <div class="cust-body">
+        <div class="preview-wrap">
+          <div id="blive">
+            <div class="bpulse" id="bpulse"></div>
+            <div id="bli">💡</div>
+            <div id="blt">What's zapping</div>
+            <div id="bls">❤️ 0</div>
+          </div>
+        </div>
+        <div class="clabel">Color</div>
+        <div class="cgrid" id="cgrid"></div>
+        <div class="clabel">Icon</div>
+        <div class="igrid" id="igrid"></div>
+        <button id="cs-save">Save style ⚡</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const POSTS=[
+  {id:1,lat:40.71,lng:-74.00,text:'Bitcoin fixes this',handle:'@satoshi99',likes:1240,color:'#f7c217',icon:'💡'},
+  {id:2,lat:35.68,lng:139.69,text:'Best ramen in Shibuya rn',handle:'@tokyobites',likes:321,color:'#ff6b6b',icon:'🍜'},
+  {id:3,lat:48.85,lng:2.35,text:'New track dropping midnight',handle:'@djbloc',likes:678,color:'#a29bfe',icon:'🎵'},
+  {id:4,lat:51.50,lng:-0.12,text:'Open source AI just dropped',handle:'@mlnews',likes:1120,color:'#6c63ff',icon:'🚀'},
+  {id:5,lat:-22.90,lng:-43.17,text:'Carnival vibes in Rio tonight',handle:'@carnivalking',likes:550,color:'#fd79a8',icon:'🎭'},
+  {id:6,lat:-1.28,lng:36.81,text:'Nairobi tech scene is on fire',handle:'@techkenya',likes:210,color:'#74b9ff',icon:'🏆'},
+  {id:7,lat:64.13,lng:-21.82,text:'Northern lights tonight Iceland',handle:'@aurora_freak',likes:910,color:'#4ecdc4',icon:'🌊'},
+  {id:8,lat:12.97,lng:77.59,text:'Street art festival Bangalore',handle:'@inkbomb',likes:87,color:'#fdcb6e',icon:'🎨'},
+  {id:9,lat:36.97,lng:-79.93,text:'Tipping is broken — likes prove it works',handle:'@you',likes:0,color:'#ff6b6b',icon:'💡'},
+  {id:10,lat:34.05,lng:-118.24,text:'LA street tacos best in the world',handle:'@tacoboss',likes:430,color:'#e17055',icon:'🌮'},
+  {id:11,lat:-33.86,lng:151.20,text:'Sydney Opera livestream now',handle:'@sydarts',likes:150,color:'#ff6b6b',icon:'🎸'},
+  {id:12,lat:52.52,lng:13.40,text:'Free concert Tiergarten tomorrow',handle:'@berlinmusic',likes:180,color:'#a29bfe',icon:'🎵'},
+  {id:13,lat:19.07,lng:72.87,text:'Mumbai monsoon hits different',handle:'@mumbailocal',likes:340,color:'#74b9ff',icon:'🌧️'},
+  {id:14,lat:31.23,lng:121.47,text:'Shanghai night market open',handle:'@shanghainights',likes:270,color:'#fdcb6e',icon:'🏮'},
+];
+
+const COLORS=['#ff6b6b','#f7c217','#6c63ff','#4ecdc4','#55efc4','#fd79a8','#74b9ff','#e17055','#fdcb6e','#a29bfe','#00b894','#fff'];
+const ICONS=['💡','⚡','🔥','🌍','🎵','📍','🚀','🎭','☕','🌊','🏆','🎸','🎨','🐝','🌿','💬','⚽','🏮'];
+
+let selColor='#ff6b6b', selIcon='💡';
+let activeId=null, activePost=null;
+let likeTotal=48000, zapCount=2847, onlineCount=891;
+let dropLat=null, dropLng=null;
+let likesGiven=0, likesReceived=0, myZapCount=4;
+let map, markers={};
+
+function hexRgba(h,a){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return `rgba(${r},${g},${b},${a})`}
+function fmtLikes(n){if(n>=1000)return(Math.round(n/100)/10)+'K';return String(Math.round(n))}
+function bubbleSize(likes){return Math.min(78,Math.max(34,30+Math.log10(likes+2)*15))}
+
+function makeBubbleHTML(p){
+  const s=bubbleSize(p.likes);
+  return `<div class="zap-bubble" style="width:${s}px;height:${s}px;background:${hexRgba(p.color,.18)};border-color:${hexRgba(p.color,.38)}">
+    <div class="zpulse" style="border-color:${p.color}"></div>
+    <div class="zb-icon">${p.icon}</div>
+    ${s>46?`<div class="zb-text">${p.text}</div>`:''}
+    <div class="zb-likes">❤️${fmtLikes(p.likes)}</div>
+  </div>`;
+}
+
+function addOrUpdate(p){
+  if(markers[p.id])map.removeLayer(markers[p.id]);
+  const s=bubbleSize(p.likes);
+  const icon=L.divIcon({className:'',html:makeBubbleHTML(p),iconSize:[s,s],iconAnchor:[s/2,s/2]});
+  const m=L.marker([p.lat,p.lng],{icon,zIndexOffset:Math.floor(p.likes/10)});
+  m.on('click',()=>openZapSheet(p));
+  m.addTo(map);
+  markers[p.id]=m;
+}
+
+function initMap(){
+  map=L.map('map',{zoomControl:false,attributionControl:true,minZoom:2,maxZoom:18,worldCopyJump:true}).setView([20,10],3);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    attribution:'&copy; OSM &copy; CARTO',subdomains:'abcd',maxZoom:20
+  }).addTo(map);
+  POSTS.forEach(p=>addOrUpdate(p));
+  map.on('click',e=>{
+    dropLat=e.latlng.lat; dropLng=e.latlng.lng;
+    document.getElementById('loctext').textContent='Pinned: '+dropLat.toFixed(2)+', '+dropLng.toFixed(2);
+  });
+}
+
+function openZapSheet(p){
+  activeId=p.id; activePost=p;
+  document.getElementById('zs-title').textContent=p.handle;
+  document.getElementById('zs-auth').textContent=p.handle+' · ❤️ '+fmtLikes(p.likes)+' likes';
+  document.getElementById('zs-content').textContent=p.text;
+  document.getElementById('lc-num').textContent=fmtLikes(p.likes);
+  openSheet('zap');
+}
+
+function addLikes(n){
+  const p=POSTS.find(x=>x.id===activeId);
+  if(!p)return;
+  p.likes+=n; likeTotal+=n; likesGiven+=n;
+  addOrUpdate(p);
+  document.getElementById('lc-num').textContent=fmtLikes(p.likes);
+  document.getElementById('zs-auth').textContent=p.handle+' · ❤️ '+fmtLikes(p.likes)+' likes';
+  document.getElementById('s-likes').textContent=Math.round(likeTotal/1000)+'K';
+  document.getElementById('ph-given').textContent=fmtLikes(likesGiven);
+  if(p.handle==='@you'){
+    likesReceived+=n;
+    document.getElementById('ph-likes').textContent=fmtLikes(likesReceived);
+  }
+  animLikeBtn();
+}
+
+function animLikeBtn(){
+  const b=document.getElementById('like-big-btn');
+  b.style.transform='scale(.82)';
+  setTimeout(()=>b.style.transform='scale(1)',130);
+}
+
+document.getElementById('like-big-btn').addEventListener('click',()=>addLikes(1));
+document.querySelectorAll('.ql-btn').forEach(b=>b.addEventListener('click',function(){addLikes(parseInt(this.dataset.n))}));
+
+function openSheet(name){
+  document.getElementById(name+'-bg').classList.add('open');
+  document.getElementById(name+'-sheet').classList.add('open');
+}
+function closeSheet(name){
+  document.getElementById(name+'-bg').classList.remove('open');
+  document.getElementById(name+'-sheet').classList.remove('open');
+}
+
+['zs-close','close-zap-sheet'].forEach(id=>document.getElementById(id).addEventListener('click',()=>closeSheet('zap')));
+document.getElementById('zap-bg').addEventListener('click',e=>{if(e.target===document.getElementById('zap-bg'))closeSheet('zap')});
+document.getElementById('ps-close').addEventListener('click',()=>closeSheet('profile'));
+document.getElementById('profile-bg').addEventListener('click',e=>{if(e.target===document.getElementById('profile-bg'))closeSheet('profile')});
+document.getElementById('cs-close').addEventListener('click',()=>closeSheet('cust'));
+document.getElementById('cust-bg').addEventListener('click',e=>{if(e.target===document.getElementById('cust-bg'))closeSheet('cust')});
+
+document.getElementById('userpill').addEventListener('click',()=>{
+  document.getElementById('ph-zaps').textContent=myZapCount;
+  openSheet('profile');
+});
+document.getElementById('custbtn').addEventListener('click',()=>openSheet('cust'));
+
+document.getElementById('zapbtn').addEventListener('click',()=>{
+  const txt=document.getElementById('postinput').value.trim();
+  if(!txt){showToast('Write something first!');return;}
+  const lat=dropLat||(36+Math.random()*2-1);
+  const lng=dropLng||(-80+Math.random()*2-1);
+  const np={id:Date.now(),lat,lng,text:txt,handle:'@you',likes:0,color:selColor,icon:selIcon};
+  POSTS.push(np); myZapCount++;
+  addOrUpdate(np); zapCount++;
+  document.getElementById('postinput').value='';
+  document.getElementById('charlimit').textContent='0 / 140';
+  document.getElementById('loctext').textContent='Tap map to pin · zap anywhere';
+  dropLat=null; dropLng=null;
+  document.getElementById('s-zaps').textContent=zapCount.toLocaleString();
+  document.getElementById('ph-zaps').textContent=myZapCount;
+  showToast('Zap dropped! ⚡');
+  map.flyTo([lat,lng],12,{duration:1.4});
+});
+
+document.getElementById('postinput').addEventListener('input',function(){
+  document.getElementById('charlimit').textContent=this.value.length+' / 140';
+});
+
+document.querySelectorAll('.tpill').forEach(pill=>{
+  pill.addEventListener('click',function(){
+    document.querySelectorAll('.tpill').forEach(p=>p.classList.remove('active'));
+    this.classList.add('active');
+    if(this.dataset.lat) map.flyTo([parseFloat(this.dataset.lat),parseFloat(this.dataset.lng)],parseInt(this.dataset.zoom),{duration:1.5});
+    else map.flyTo([20,10],3,{duration:1.8});
+  });
+});
+
+function buildCust(){
+  const cg=document.getElementById('cgrid');
+  COLORS.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='cdot'+(c===selColor?' sel':'');
+    d.style.background=c;
+    d.addEventListener('click',()=>{
+      selColor=c;
+      document.querySelectorAll('.cdot').forEach(x=>x.classList.remove('sel'));
+      d.classList.add('sel');
+      updatePreview();
+    });
+    cg.appendChild(d);
+  });
+  const ig=document.getElementById('igrid');
+  ICONS.forEach(ic=>{
+    const d=document.createElement('div');
+    d.className='iopt'+(ic===selIcon?' sel':'');
+    d.textContent=ic;
+    d.addEventListener('click',()=>{
+      selIcon=ic;
+      document.querySelectorAll('.iopt').forEach(x=>x.classList.remove('sel'));
+      d.classList.add('sel');
+      updatePreview();
+    });
+    ig.appendChild(d);
+  });
+}
+
+function updatePreview(){
+  const bl=document.getElementById('blive');
+  bl.style.background=hexRgba(selColor,.18);
+  bl.style.borderColor=hexRgba(selColor,.42);
+  document.getElementById('bpulse').style.borderColor=selColor;
+  document.getElementById('bli').textContent=selIcon;
+  document.getElementById('topava').style.background=selColor;
+  document.getElementById('ph-ava').style.background=selColor;
+}
+
+document.getElementById('cs-save').addEventListener('click',()=>{
+  closeSheet('cust');
+  showToast('Bubble style saved!');
+});
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  clearTimeout(window._tt);
+  window._tt=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+setInterval(()=>{
+  const p=POSTS[Math.floor(Math.random()*POSTS.length)];
+  const bump=Math.floor(Math.random()*8)+1;
+  p.likes+=bump; likeTotal+=bump;
+  addOrUpdate(p);
+  onlineCount+=Math.random()>.5?1:-1;
+  onlineCount=Math.max(820,onlineCount);
+  document.getElementById('s-likes').textContent=Math.round(likeTotal/1000)+'K';
+  document.getElementById('s-online').textContent=onlineCount.toLocaleString();
+},3000);
+
+buildCust();
+updatePreview();
+initMap();
+</script>
+</body>
+</html>
