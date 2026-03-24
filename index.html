@@ -1,0 +1,1621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="1Buzz">
+<meta name="theme-color" content="#06080f">
+<meta name="description" content="See what's buzzing on Earth">
+<title>1Buzz</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#06080f}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;color:#fff;overscroll-behavior:none}
+#app{width:100vw;height:100dvh;position:relative;overflow:hidden}
+
+#map{position:absolute;inset:0;z-index:1}
+#loading-screen{position:absolute;inset:0;background:#06080f;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+#loading-screen .logo-big{font-size:48px;font-weight:800;letter-spacing:-2px;color:#fff}
+#loading-screen .logo-big span{color:#f7c217}
+#loading-screen .tagline-sm{font-size:14px;color:rgba(255,255,255,.4);letter-spacing:.5px}
+.spinner{width:32px;height:32px;border:3px solid rgba(247,194,23,.2);border-top-color:#f7c217;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#auth-screen{position:absolute;inset:0;background:#06080f;z-index:99;display:none;flex-direction:column;align-items:center;justify-content:center;padding:32px;overflow-y:auto}
+#auth-screen.show{display:flex}
+.auth-logo{font-size:52px;font-weight:800;letter-spacing:-2px;color:#fff;margin-bottom:8px}
+.auth-logo span{color:#f7c217}
+.auth-tag{font-size:15px;color:rgba(255,255,255,.4);letter-spacing:.5px;margin-bottom:40px}
+.auth-title{font-size:22px;font-weight:700;color:#fff;margin-bottom:8px;text-align:center}
+.auth-sub{font-size:14px;color:rgba(255,255,255,.45);text-align:center;line-height:1.6;margin-bottom:24px}
+.auth-box{width:100%;max-width:320px;display:flex;flex-direction:column;gap:10px}
+.auth-input{background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:14px;padding:14px 18px;font-size:15px;color:#fff;font-family:inherit;outline:none;transition:border .15s;-webkit-appearance:none}
+.auth-input:focus{border-color:rgba(247,194,23,.5)}
+.auth-input::placeholder{color:rgba(255,255,255,.25)}
+#auth-submit-btn{background:#f7c217;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;color:#000;cursor:pointer;font-family:inherit;transition:background .15s;margin-top:4px}
+#auth-submit-btn:active{background:#ffe040}
+.auth-toggle{font-size:13px;color:rgba(255,255,255,.4);text-align:center;margin-top:8px;cursor:pointer}
+.auth-toggle span{color:#f7c217;font-weight:600}
+.auth-divider{display:flex;align-items:center;gap:12px;margin:8px 0;width:100%;max-width:320px}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:0.5px;background:rgba(255,255,255,.1)}
+.auth-divider-text{font-size:12px;color:rgba(255,255,255,.25)}
+#google-btn{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:14px;padding:13px 28px;font-size:14px;font-weight:600;color:#fff;cursor:pointer;font-family:inherit;width:100%;max-width:320px;justify-content:center;transition:background .15s}
+#google-btn:active{background:rgba(255,255,255,.12)}
+.auth-google-icon{width:20px;height:20px}
+#skip-btn{background:transparent;border:none;padding:10px;font-size:13px;color:rgba(255,255,255,.3);cursor:pointer;font-family:inherit;width:100%;max-width:320px}
+#skip-btn:active{color:#fff}
+.auth-note{font-size:11px;color:rgba(255,255,255,.15);margin-top:16px;text-align:center;line-height:1.6}
+.auth-error{font-size:13px;color:#ff6b6b;text-align:center;min-height:18px;margin-top:-4px}
+#globe-container{display:none!important}
+#view-toggle{display:none}
+#settings-btn{width:36px;height:36px;background:rgba(6,8,15,.8);border:0.5px solid rgba(255,255,255,.15);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:all;flex-shrink:0;transition:background .15s}
+#settings-btn:active{background:rgba(255,255,255,.1)}
+#settings-btn svg{width:16px;height:16px}
+#settings-bg{position:absolute;inset:0;background:rgba(0,0,0,.65);z-index:50;opacity:0;pointer-events:none;transition:opacity .24s}
+#settings-bg.open{opacity:1;pointer-events:all}
+#settings-sheet{background:#0d1117;border:0.5px solid rgba(255,255,255,.12);border-radius:24px 24px 0 0;position:absolute;bottom:0;left:0;right:0;max-height:88vh;overflow-y:auto;transform:translateY(100%);transition:transform .28s cubic-bezier(.32,.72,0,1);padding-bottom:env(safe-area-inset-bottom,20px)}
+#settings-sheet.open{transform:translateY(0)}
+.sett-section{padding:16px 20px 4px}
+.sett-label{font-size:11px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.7px;text-transform:uppercase;margin-bottom:12px}
+.sett-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:0.5px solid rgba(255,255,255,.06)}
+.sett-row:last-child{border-bottom:none}
+.sett-row-left{display:flex;align-items:center;gap:12px}
+.sett-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.sett-title{font-size:14px;font-weight:600;color:#fff}
+.sett-sub{font-size:11px;color:rgba(255,255,255,.35);margin-top:2px}
+.sett-right{display:flex;align-items:center;gap:8px}
+.sett-badge{font-size:11px;font-weight:600;padding:4px 10px;border-radius:12px}
+.sett-badge.coming{background:rgba(255,255,255,.07);color:rgba(255,255,255,.35)}
+.sett-badge.active{background:rgba(247,194,23,.15);color:#f7c217}
+.sett-badge.connected{background:rgba(85,239,196,.12);color:#55efc4}
+.sett-chevron{font-size:14px;color:rgba(255,255,255,.25)}
+.view-toggle-row{display:flex;gap:8px}
+.view-btn{flex:1;padding:10px 8px;border-radius:12px;border:0.5px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);font-size:13px;font-weight:600;color:rgba(255,255,255,.5);cursor:pointer;text-align:center;transition:all .15s}
+.view-btn.active{background:rgba(247,194,23,.12);border-color:rgba(247,194,23,.35);color:#f7c217}
+.toggle-switch-row{display:flex;align-items:center;justify-content:space-between;padding:4px 0}
+.toggle-switch-label{font-size:14px;color:rgba(255,255,255,.7);display:flex;align-items:center;gap:8px}
+.toggle-switch{position:relative;width:50px;height:28px;cursor:pointer;flex-shrink:0}
+.toggle-switch input{opacity:0;width:0;height:0;position:absolute}
+.toggle-track{position:absolute;inset:0;background:rgba(255,255,255,.12);border-radius:14px;transition:background .2s}
+.toggle-switch input:checked+.toggle-track{background:#f7c217}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:22px;height:22px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.toggle-switch input:checked~.toggle-thumb{transform:translateX(22px)}
+.wallet-card{background:rgba(247,194,23,.07);border:0.5px solid rgba(247,194,23,.2);border-radius:16px;padding:16px;margin:0 20px 4px}
+.wc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.wc-title{font-size:13px;font-weight:700;color:#f7c217}
+.wc-status{font-size:11px;color:rgba(247,194,23,.5);display:flex;align-items:center;gap:5px}
+.wc-dot{width:6px;height:6px;border-radius:50%;background:rgba(247,194,23,.4)}
+.wc-balance{font-size:32px;font-weight:800;color:#f7c217;letter-spacing:-1px;margin-bottom:2px}
+.wc-balance-sub{font-size:12px;color:rgba(247,194,23,.45);margin-bottom:14px}
+.wc-actions{display:flex;gap:8px}
+.wc-btn{flex:1;padding:10px 8px;border-radius:12px;border:0.5px solid rgba(247,194,23,.25);background:rgba(247,194,23,.08);font-size:13px;font-weight:700;color:#f7c217;cursor:pointer;text-align:center;transition:background .15s;font-family:inherit}
+.wc-btn:active{background:rgba(247,194,23,.2)}
+.wc-btn.primary{background:#f7c217;color:#000;border-color:#f7c217}
+.wc-btn.primary:active{background:#ffe040}
+.connect-wallet-btn{width:calc(100% - 40px);margin:0 20px;background:rgba(247,194,23,.08);border:0.5px solid rgba(247,194,23,.25);border-radius:14px;padding:14px;font-size:14px;font-weight:700;color:#f7c217;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .15s}
+.connect-wallet-btn:active{background:rgba(247,194,23,.18)}
+.leaflet-container{background:#06080f!important}
+.leaflet-tile-pane{filter:saturate(.65) brightness(.5) hue-rotate(195deg)}
+.leaflet-control-zoom{display:none}
+.leaflet-control-attribution{font-size:8px!important;opacity:.3;background:rgba(0,0,0,.4)!important;color:rgba(255,255,255,.4)!important;padding:2px 5px!important}
+.leaflet-control-attribution a{color:rgba(255,255,255,.4)!important}
+
+.zap-bubble{border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid rgba(255,255,255,.22);overflow:hidden;position:relative;transition:transform .12s}
+.zap-bubble:active{transform:scale(.94)}
+.zb-icon{font-size:13px;line-height:1;pointer-events:none}
+.zb-likes{font-size:7px;font-weight:800;color:#f7c217;margin-top:1px;pointer-events:none}
+.zb-text{font-size:7px;font-weight:500;color:rgba(255,255,255,.9);text-align:center;line-height:1.2;padding:0 3px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;pointer-events:none}
+.zpulse{position:absolute;border-radius:50%;border:1.5px solid;opacity:0;width:120%;height:120%;top:-10%;left:-10%;pointer-events:none;animation:zpo 2.4s ease-out infinite}
+@keyframes zpo{0%{opacity:.5;width:108%;height:108%;top:-4%;left:-4%}100%{opacity:0;width:195%;height:195%;top:-47%;left:-47%}}
+
+#topbar{position:absolute;top:0;left:0;right:0;z-index:10;padding:env(safe-area-inset-top,12px) 15px 0;background:linear-gradient(180deg,rgba(6,8,15,.95) 0%,transparent 100%);pointer-events:none}
+#topbar-inner{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px}
+#logo{font-size:22px;font-weight:800;letter-spacing:-1px;pointer-events:all}
+#logo span{color:#f7c217}
+.tagline{font-size:10px;color:rgba(255,255,255,.35);letter-spacing:.5px}
+#userpill{display:flex;align-items:center;gap:7px;background:rgba(6,8,15,.8);border:0.5px solid rgba(255,255,255,.18);border-radius:22px;padding:6px 13px;font-size:12px;cursor:pointer;pointer-events:all;min-height:44px}
+.ava{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#000;flex-shrink:0}
+
+#trendbar{position:absolute;top:calc(env(safe-area-inset-top,12px) + 54px);left:0;right:0;padding:0 14px;display:flex;gap:7px;overflow-x:auto;z-index:10;scrollbar-width:none}
+#trendbar::-webkit-scrollbar{display:none}
+#searchbar{position:absolute;top:calc(env(safe-area-inset-top,12px) + 104px);left:14px;right:14px;z-index:11;display:none}
+#searchbar.open{display:block}
+#search-input-wrap{display:flex;align-items:center;background:rgba(13,17,23,.95);border:0.5px solid rgba(255,255,255,.18);border-radius:16px;padding:0 14px;gap:10px;backdrop-filter:blur(12px)}
+#search-icon{font-size:16px;color:rgba(255,255,255,.4);flex-shrink:0}
+#search-input{flex:1;background:transparent;border:none;outline:none;color:#fff;font-size:15px;font-family:inherit;padding:13px 0;-webkit-appearance:none}
+#search-input::placeholder{color:rgba(255,255,255,.3)}
+#search-clear{font-size:18px;color:rgba(255,255,255,.3);cursor:pointer;padding:4px;display:none}
+#search-clear.show{display:block}
+#search-results{background:rgba(13,17,23,.97);border:0.5px solid rgba(255,255,255,.12);border-radius:14px;margin-top:6px;overflow:hidden;display:none}
+#search-results.show{display:block}
+.sr-item{padding:13px 16px;font-size:14px;color:#fff;cursor:pointer;border-bottom:0.5px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px;transition:background .12s}
+.sr-item:last-child{border-bottom:none}
+.sr-item:active{background:rgba(255,255,255,.08)}
+.sr-icon{font-size:16px;flex-shrink:0}
+.sr-name{font-weight:600;font-size:14px}
+.sr-sub{font-size:11px;color:rgba(255,255,255,.35);margin-top:2px}
+#search-btn{width:36px;height:36px;background:rgba(6,8,15,.8);border:0.5px solid rgba(255,255,255,.15);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:all;flex-shrink:0;transition:background .15s;font-size:16px}
+#search-btn:active{background:rgba(255,255,255,.1)}
+.tpill{flex-shrink:0;background:rgba(6,8,15,.78);border:0.5px solid rgba(255,255,255,.14);border-radius:22px;padding:7px 13px;font-size:12px;color:rgba(255,255,255,.6);cursor:pointer;white-space:nowrap;min-height:36px;display:flex;align-items:center}
+.tpill.active{background:rgba(247,194,23,.12);border-color:rgba(247,194,23,.38);color:#f7c217}
+
+#statsbar{position:absolute;left:12px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px;z-index:10}
+.sc{background:rgba(6,8,15,.78);border:0.5px solid rgba(255,255,255,.1);border-radius:11px;padding:8px 10px;text-align:center;min-width:54px}
+.sv{font-size:13px;font-weight:700;color:#f7c217}
+.sl{font-size:9px;color:rgba(255,255,255,.3);margin-top:2px}
+
+#bottombar{position:absolute;bottom:0;left:0;right:0;z-index:10;padding:10px 14px calc(env(safe-area-inset-bottom,16px) + 6px);background:linear-gradient(0deg,rgba(6,8,15,.96) 0%,transparent 100%)}
+#composer{display:none!important}
+#charlimit{display:none!important}
+#locrow{display:flex;align-items:center;gap:6px;margin-bottom:8px;padding-left:2px}
+.locpin{width:8px;height:8px;background:#f7c217;border-radius:50% 50% 50% 0;transform:rotate(-45deg);flex-shrink:0}
+#loctext{font-size:11px;color:rgba(255,255,255,.35)}
+#composer{display:flex;gap:8px;align-items:center}
+#custbtn{width:44px;height:44px;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;flex-shrink:0}
+#postinput{flex:1;background:rgba(255,255,255,.08);border:0.5px solid rgba(255,255,255,.18);border-radius:22px;padding:11px 16px;color:#fff;font-size:16px;outline:none;font-family:inherit;resize:none;height:44px;line-height:1.2;-webkit-appearance:none}
+#postinput::placeholder{color:rgba(255,255,255,.28)}
+#postinput:focus{border-color:rgba(247,194,23,.5);background:rgba(255,255,255,.1)}
+#zapbtn{width:44px;height:44px;background:#f7c217;border:none;border-radius:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#zapbtn:active{transform:scale(.93);background:#ffe040}
+#charlimit{font-size:10px;color:rgba(255,255,255,.2);text-align:right;margin-top:5px}
+#addbtn{position:absolute;bottom:calc(env(safe-area-inset-bottom,16px) + 90px);right:18px;width:64px;height:64px;background:#f7c217;border:none;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:20;box-shadow:0 4px 20px rgba(0,0,0,.5);transition:transform .15s,background .15s}
+#addbtn:active{transform:scale(.91);background:#ffe040}
+#addbtn svg{width:30px;height:30px}
+#compose-screen{position:absolute;inset:0;background:#06080f;z-index:55;transform:translateY(100%);transition:transform .32s cubic-bezier(.32,.72,0,1);overflow-y:auto;display:flex;flex-direction:column}
+#compose-screen.open{transform:translateY(0)}
+#cs-navbar{display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,14px) + 10px) 16px 12px;background:#06080f;border-bottom:0.5px solid rgba(255,255,255,.08);flex-shrink:0}
+#cs-cancel{font-size:15px;color:rgba(255,255,255,.5);cursor:pointer;padding:6px;min-width:60px}
+#cs-cancel:active{color:#fff}
+#cs-navbar-title{font-size:15px;font-weight:700;color:#fff}
+#cs-post-btn{background:#f7c217;border:none;border-radius:22px;padding:8px 20px;font-size:14px;font-weight:700;color:#000;cursor:pointer;font-family:inherit;min-width:80px;transition:background .15s}
+#cs-post-btn:active{background:#ffe040}
+#cs-post-btn:disabled{background:rgba(247,194,23,.3);color:rgba(0,0,0,.4)}
+#cs-body{flex:1;padding:16px;display:flex;flex-direction:column;gap:12px}
+#cs-profile-row{display:flex;align-items:center;gap:10px}
+#cs-ava{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#000;flex-shrink:0}
+#cs-username{font-size:14px;font-weight:600;color:#fff}
+#cs-location-pill{font-size:11px;color:rgba(255,255,255,.35);display:flex;align-items:center;gap:4px;margin-top:2px;cursor:pointer}
+#cs-location-pill:active{color:#f7c217}
+.cs-locpin{width:7px;height:7px;background:#f7c217;border-radius:50% 50% 50% 0;transform:rotate(-45deg);flex-shrink:0}
+#cs-tagline-wrap{position:relative}
+#cs-tagline{width:100%;background:transparent;border:none;border-bottom:1.5px solid rgba(255,255,255,.15);padding:10px 0;color:#fff;font-size:22px;font-weight:700;outline:none;font-family:inherit;resize:none;height:66px;-webkit-appearance:none;letter-spacing:-.3px;line-height:1.2}
+#cs-tagline::placeholder{color:rgba(255,255,255,.2);font-weight:700}
+#cs-tagline:focus{border-bottom-color:rgba(247,194,23,.6)}
+#cs-taglimit{position:absolute;bottom:6px;right:0;font-size:10px;color:rgba(255,255,255,.25)}
+#cs-body-text{width:100%;background:rgba(255,255,255,.05);border:0.5px solid rgba(255,255,255,.1);border-radius:14px;padding:12px 14px;color:#fff;font-size:15px;outline:none;font-family:inherit;resize:none;height:110px;-webkit-appearance:none;line-height:1.5}
+#cs-body-text::placeholder{color:rgba(255,255,255,.25)}
+#cs-body-text:focus{border-color:rgba(247,194,23,.35)}
+.cs-section-label{font-size:11px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px}
+#cs-link-row{display:flex;gap:8px;align-items:center}
+#cs-link-input{flex:1;background:rgba(255,255,255,.05);border:0.5px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 13px;color:#fff;font-size:14px;outline:none;font-family:inherit;-webkit-appearance:none}
+#cs-link-input::placeholder{color:rgba(255,255,255,.25)}
+#cs-link-input:focus{border-color:rgba(247,194,23,.35)}
+.cs-social-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.cs-social-btn{background:rgba(255,255,255,.06);border:0.5px solid rgba(255,255,255,.12);border-radius:22px;padding:7px 13px;font-size:12px;color:rgba(255,255,255,.6);cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;transition:all .15s}
+.cs-social-btn:active{background:rgba(255,255,255,.14);color:#fff}
+.cs-social-btn.linked{border-color:rgba(247,194,23,.4);color:#f7c217;background:rgba(247,194,23,.08)}
+#cs-color-row{display:flex;gap:9px;flex-wrap:wrap}
+.cs-cdot{width:34px;height:34px;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:all .13s;flex-shrink:0}
+.cs-cdot:active{transform:scale(.9)}
+.cs-cdot.sel{border-color:#fff;transform:scale(1.1)}
+#cs-icon-row{display:flex;gap:8px;flex-wrap:wrap}
+.cs-iopt{width:42px;height:42px;background:rgba(255,255,255,.06);border:0.5px solid rgba(255,255,255,.1);border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;transition:all .13s}
+.cs-iopt:active{transform:scale(.9)}
+.cs-iopt.sel{background:rgba(247,194,23,.15);border-color:rgba(247,194,23,.5)}
+#cs-emoji-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.cs-emoji{font-size:24px;cursor:pointer;padding:4px;border-radius:8px;transition:transform .12s}
+.cs-emoji:active{transform:scale(.85)}
+#cs-bubble-preview-wrap{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.08);border-radius:14px;padding:14px}
+#cs-bubble-preview{width:64px;height:64px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.2);flex-shrink:0;overflow:hidden;transition:all .22s}
+#cs-preview-tag{font-size:8px;font-weight:700;color:#fff;margin-top:2px;text-align:center;padding:0 4px}
+#cs-preview-likes{font-size:8px;font-weight:800;color:#ff6b6b;margin-top:1px}
+.cs-preview-info{flex:1}
+.cs-preview-tagline{font-size:13px;font-weight:700;color:#fff;line-height:1.3;margin-bottom:3px}
+.cs-preview-sub{font-size:11px;color:rgba(255,255,255,.35)}
+#cs-footer{padding:12px 16px calc(env(safe-area-inset-bottom,16px) + 8px);border-top:0.5px solid rgba(255,255,255,.08);background:#06080f;flex-shrink:0}
+#pin-mode-overlay{position:absolute;inset:0;z-index:54;pointer-events:none;display:none}
+#pin-mode-overlay.active{display:block}
+#pin-mode-top{pointer-events:all}
+#pin-mode-bottom{pointer-events:all}
+#pin-mode-top{position:absolute;top:0;left:0;right:0;padding:calc(env(safe-area-inset-top,14px)+10px) 16px 14px;background:linear-gradient(180deg,rgba(6,8,15,.97) 0%,transparent 100%);display:flex;align-items:center;justify-content:space-between;z-index:55}
+#pin-mode-label{font-size:15px;font-weight:700;color:#fff;text-align:center;flex:1}
+#pin-mode-cancel{font-size:14px;color:rgba(255,255,255,.5);cursor:pointer;padding:6px;min-width:60px}
+#pin-mode-bottom{position:absolute;bottom:0;left:0;right:0;padding:16px 16px calc(env(safe-area-inset-bottom,16px)+12px);background:linear-gradient(0deg,rgba(6,8,15,.97) 0%,transparent 100%);z-index:55}
+#pin-mode-hint{font-size:13px;color:rgba(255,255,255,.5);text-align:center;margin-bottom:12px}
+#pin-confirm-btn{width:100%;background:#f7c217;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;color:#000;cursor:pointer;font-family:inherit;display:none;transition:background .15s}
+#pin-confirm-btn:active{background:#ffe040}
+#pin-confirm-btn.visible{display:block}
+#crosshair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:56;display:none}
+#crosshair.active{display:block}
+#crosshair svg{width:48px;height:48px}
+#pin-coords{position:absolute;bottom:calc(env(safe-area-inset-bottom,16px)+80px);left:50%;transform:translateX(-50%);background:rgba(6,8,15,.85);border:0.5px solid rgba(247,194,23,.4);border-radius:22px;padding:6px 16px;font-size:12px;color:#f7c217;font-weight:600;white-space:nowrap;z-index:57;display:none}
+#pin-coords.visible{display:block}
+
+#toast{position:absolute;top:42%;left:50%;transform:translate(-50%,-50%) scale(.88);background:rgba(247,194,23,.13);border:0.5px solid rgba(247,194,23,.38);border-radius:16px;padding:12px 22px;font-size:14px;font-weight:600;color:#f7c217;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;z-index:60;white-space:nowrap}
+#toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+/* SHEETS */
+.sheet-bg{position:absolute;inset:0;background:rgba(0,0,0,.65);z-index:50;opacity:0;pointer-events:none;transition:opacity .24s}
+.sheet-bg.open{opacity:1;pointer-events:all}
+.sheet{background:#0d1117;border:0.5px solid rgba(255,255,255,.12);border-radius:24px 24px 0 0;position:absolute;bottom:0;left:0;right:0;max-height:88vh;overflow-y:auto;transform:translateY(100%);transition:transform .28s cubic-bezier(.32,.72,0,1);padding-bottom:env(safe-area-inset-bottom,20px)}
+.sheet.open{transform:translateY(0)}
+.sheet-handle{width:36px;height:4px;background:rgba(255,255,255,.18);border-radius:2px;margin:12px auto 0}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 4px}
+.sheet-head h3{font-size:17px;font-weight:700}
+.sh-close{width:32px;height:32px;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.13);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;color:rgba(255,255,255,.55);flex-shrink:0}
+
+/* ZAP SHEET */
+.zpreview{background:rgba(255,255,255,.05);border:0.5px solid rgba(255,255,255,.1);border-radius:13px;padding:13px;margin:14px 20px;font-size:14px;color:rgba(255,255,255,.82);line-height:1.5}
+.zauth{font-size:12px;color:rgba(255,255,255,.35);padding:0 20px;margin-bottom:14px}
+.like-section{padding:0 20px 16px;display:flex;flex-direction:column;align-items:center;gap:14px}
+#like-big-btn{width:80px;height:80px;background:rgba(255,107,107,.12);border:1.5px solid rgba(255,107,107,.35);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:transform .12s,background .15s;font-size:30px}
+#like-big-btn:active{transform:scale(.88);background:rgba(255,107,107,.28)}
+#like-count-display{font-size:15px;font-weight:700;color:#fff}
+#like-count-display span{color:#ff6b6b}
+.quick-likes{display:flex;gap:8px}
+.ql-btn{background:rgba(255,107,107,.1);border:0.5px solid rgba(255,107,107,.25);border-radius:22px;padding:9px 16px;font-size:13px;font-weight:700;color:#ff6b6b;cursor:pointer;min-height:44px;display:flex;align-items:center}
+.ql-btn:active{background:rgba(255,107,107,.25)}
+#close-zap-sheet{width:calc(100% - 40px);margin:0 20px 8px;background:#ff6b6b;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit}
+#close-zap-sheet:active{background:#ff4444}
+
+/* PROFILE SHEET */
+.profile-hero{padding:0 20px 0}
+.ph-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px}
+.ph-ava{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#000;border:3px solid #0d1117}
+.ph-name{font-size:19px;font-weight:800;letter-spacing:-.4px}
+.ph-handle{font-size:13px;color:rgba(255,255,255,.35);margin-bottom:6px}
+.ph-bio{font-size:13px;color:rgba(255,255,255,.65);line-height:1.55;margin-bottom:16px}
+.ph-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(255,255,255,.07);border-radius:13px;overflow:hidden;margin-bottom:16px}
+.ph-stat{background:#0d1117;padding:11px 4px;text-align:center}
+.ph-sv{font-size:15px;font-weight:700;color:#f7c217}
+.ph-sl{font-size:9px;color:rgba(255,255,255,.28);margin-top:2px}
+.install-banner{background:rgba(247,194,23,.08);border:0.5px solid rgba(247,194,23,.2);border-radius:13px;padding:13px 15px;margin:0 20px 16px;display:flex;align-items:center;gap:10px}
+.ib-icon{font-size:22px;flex-shrink:0}
+.ib-title{font-size:13px;font-weight:600;color:#f7c217}
+.ib-sub{font-size:11px;color:rgba(247,194,23,.45);margin-top:2px}
+.myzap-item{display:flex;gap:11px;padding:12px 20px;border-top:0.5px solid rgba(255,255,255,.06)}
+.mz-bub{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;border:1.5px solid rgba(255,255,255,.12)}
+.mz-text{font-size:13px;color:#fff;line-height:1.4;margin-bottom:4px}
+.mz-meta{font-size:11px;color:rgba(255,255,255,.3);display:flex;gap:8px}
+.mz-likes{color:#ff6b6b;font-weight:700}
+
+/* CUST SHEET */
+.cust-body{padding:0 20px 8px}
+.preview-wrap{display:flex;justify-content:center;margin-bottom:22px}
+#blive{width:90px;height:90px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.2);transition:all .22s;position:relative;overflow:hidden}
+.bpulse{position:absolute;border-radius:50%;border:1.5px solid;opacity:0;width:118%;height:118%;top:-9%;left:-9%;pointer-events:none;animation:bpo 2s ease-out infinite}
+@keyframes bpo{0%{opacity:.45;width:108%;height:108%;top:-4%;left:-4%}100%{opacity:0;width:175%;height:175%;top:-37%;left:-37%}}
+#bli{font-size:24px;line-height:1}
+#blt{font-size:9px;font-weight:600;color:#fff;text-align:center;padding:0 8px;margin-top:3px}
+#bls{font-size:9px;font-weight:800;color:#ff6b6b;margin-top:2px}
+.clabel{font-size:11px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.7px;text-transform:uppercase;margin-bottom:11px}
+.cgrid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px}
+.cdot{width:36px;height:36px;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:all .12s}
+.cdot.sel{border-color:#fff;transform:scale(1.1)}
+.igrid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:20px}
+.iopt{aspect-ratio:1;background:rgba(255,255,255,.06);border:0.5px solid rgba(255,255,255,.1);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;min-height:44px}
+.iopt.sel{background:rgba(255,107,107,.15);border-color:rgba(255,107,107,.45)}
+#cs-save{width:100%;background:#ff6b6b;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;margin-bottom:8px}
+#cs-save:active{background:#ff4444}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="loading-screen">
+    <div class="logo-big">1<span>Buzz</span></div>
+    <div class="tagline-sm">See what's buzzing on Earth</div>
+    <div class="spinner"></div>
+  </div>
+
+  <div id="auth-screen">
+    <div class="auth-logo">1<span>Buzz</span></div>
+    <div class="auth-tag">See what's buzzing on Earth</div>
+    <div class="auth-title" id="auth-title">Create your account</div>
+    <div class="auth-sub">Drop buzzes anywhere on Earth and watch them grow.</div>
+    <div class="auth-box">
+      <input class="auth-input" id="auth-name" type="text" placeholder="Your name" autocomplete="name"/>
+      <input class="auth-input" id="auth-email" type="email" placeholder="Email" autocomplete="email"/>
+      <input class="auth-input" id="auth-password" type="password" placeholder="Password" autocomplete="current-password"/>
+      <div class="auth-error" id="auth-error"></div>
+      <button id="auth-submit-btn">Create account ⚡</button>
+      <div class="auth-toggle" id="auth-toggle">Already have an account? <span>Sign in</span></div>
+    </div>
+    <div class="auth-divider"><div class="auth-divider-text">or</div></div>
+    <button id="google-btn">
+      <svg class="auth-google-icon" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Continue with Google
+    </button>
+    <button id="skip-btn">Browse without account</button>
+    <div class="auth-note">By signing up you agree to keep it real. No hate. No spam. No fake buzzes.</div>
+  </div>
+
+  <div id="map"></div>
+  <div id="globe-container"></div>
+  <div id="view-toggle">🌍 Globe</div>
+
+  <div id="topbar">
+    <div id="topbar-inner">
+      <div>
+        <div id="logo">1<span>Buzz</span></div>
+        <div class="tagline">See what's buzzing on Earth</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;pointer-events:all">
+        <div id="search-btn">🔍</div>
+        <div id="userpill"><div class="ava" id="topava" style="background:#ff6b6b">YO</div><span>@you</span></div>
+        <div id="settings-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.8" stroke-linecap="round">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="trendbar">
+    <div class="tpill active">⚡ Top</div>
+    <div class="tpill" data-lat="40.71" data-lng="-74.00" data-zoom="12">New York</div>
+    <div class="tpill" data-lat="35.68" data-lng="139.69" data-zoom="12">Tokyo</div>
+    <div class="tpill" data-lat="51.50" data-lng="-0.12" data-zoom="12">London</div>
+    <div class="tpill" data-lat="-22.90" data-lng="-43.17" data-zoom="12">Rio</div>
+    <div class="tpill" data-lat="-1.28" data-lng="36.81" data-zoom="12">Nairobi</div>
+    <div class="tpill" data-lat="48.85" data-lng="2.35" data-zoom="12">Paris</div>
+    <div class="tpill" id="nearme-pill">📍 Near me</div>
+  </div>
+
+  <div id="searchbar">
+    <div id="search-input-wrap">
+      <div id="search-icon">🔍</div>
+      <input id="search-input" type="text" placeholder="Search any city, place, or address..." autocomplete="off"/>
+      <div id="search-clear">✕</div>
+    </div>
+    <div id="search-results"></div>
+  </div>
+
+  <div id="statsbar">
+    <div class="sc"><div class="sv" id="s-zaps">0</div><div class="sl">buzzes</div></div>
+    <div class="sc"><div class="sv" id="s-likes">0</div><div class="sl">likes</div></div>
+  </div>
+
+  <button id="addbtn" title="Drop a buzz">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#000" stroke-width="3" stroke-linecap="round"/></svg>
+  </button>
+
+  <div id="compose-screen">
+    <div id="cs-navbar">
+      <div id="cs-cancel">Cancel</div>
+      <div id="cs-navbar-title">New Buzz</div>
+      <button id="cs-post-btn" disabled>Post</button>
+    </div>
+    <div id="cs-body">
+      <div id="cs-profile-row">
+        <div id="cs-ava" style="background:#ff6b6b">YO</div>
+        <div>
+          <div id="cs-username">@you</div>
+          <div id="cs-location-pill"><div class="cs-locpin"></div><span id="cs-loc-text">Tap the map to pin location</span></div>
+        </div>
+      </div>
+
+      <div id="cs-tagline-wrap">
+        <textarea id="cs-tagline" placeholder="What's buzzing? (shown on bubble)" maxlength="60" rows="2"></textarea>
+        <span id="cs-taglimit">0/60</span>
+      </div>
+
+      <textarea id="cs-body-text" placeholder="Add more detail, context, a story... (optional)" maxlength="500"></textarea>
+
+      <div>
+        <div class="cs-section-label">Add emojis to body</div>
+        <div id="cs-emoji-row"></div>
+      </div>
+
+      <div>
+        <div class="cs-section-label">Bubble preview</div>
+        <div id="cs-bubble-preview-wrap">
+          <div id="cs-bubble-preview">
+            <div id="cs-preview-tag">What's buzzing?</div>
+            <div id="cs-preview-likes">❤️ 0</div>
+          </div>
+          <div class="cs-preview-info">
+            <div class="cs-preview-tagline" id="cs-prev-tagline">Your tagline appears here</div>
+            <div class="cs-preview-sub">@you · pinned to map</div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="cs-section-label">Bubble color</div>
+        <div id="cs-color-row"></div>
+      </div>
+
+      <div>
+        <div class="cs-section-label">Bubble icon</div>
+        <div id="cs-icon-row"></div>
+      </div>
+
+      <div>
+        <div class="cs-section-label">Link</div>
+        <div id="cs-link-row">
+          <input id="cs-link-input" type="url" placeholder="https://yourwebsite.com or social link"/>
+        </div>
+      </div>
+
+      <div>
+        <div class="cs-section-label">Connect socials</div>
+        <div class="cs-social-row">
+          <div class="cs-social-btn" data-soc="x">𝕏 Twitter</div>
+          <div class="cs-social-btn" data-soc="ig">📷 Instagram</div>
+          <div class="cs-social-btn" data-soc="tt">🎵 TikTok</div>
+          <div class="cs-social-btn" data-soc="yt">▶️ YouTube</div>
+          <div class="cs-social-btn" data-soc="li">💼 LinkedIn</div>
+          <div class="cs-social-btn" data-soc="ns">⚡ Nostr</div>
+        </div>
+      </div>
+
+      <div style="height:20px"></div>
+    </div>
+  </div>
+
+  <div id="settings-bg">
+    <div class="sheet" id="settings-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head"><h3>Settings</h3><div class="sh-close" id="sett-close">✕</div></div>
+
+      <div class="sett-section">
+        <div class="sett-label">Map view</div>
+        <div class="sett-row">
+          <div class="sett-row-left">
+            <div class="sett-icon" style="background:rgba(55,138,221,.1)">🗺</div>
+            <div>
+              <div class="sett-title">Dark map</div>
+              <div class="sett-sub">English labels · street level zoom</div>
+            </div>
+          </div>
+          <div class="sett-right"><div class="sett-badge active">Active</div></div>
+        </div>
+        <div class="sett-row">
+          <div class="sett-row-left">
+            <div class="sett-icon" style="background:rgba(55,138,221,.08)">🌍</div>
+            <div>
+              <div class="sett-title">3D Globe view</div>
+              <div class="sett-sub">Full Earth perspective</div>
+            </div>
+          </div>
+          <div class="sett-right"><div class="sett-badge coming">Coming soon</div></div>
+        </div>
+      </div>
+
+      <div class="wallet-card" id="wallet-connected" style="display:none">
+        <div class="wc-top">
+          <div class="wc-title">⚡ Lightning wallet</div>
+          <div class="wc-status"><div class="wc-dot"></div>Connected</div>
+        </div>
+        <div class="wc-balance" id="wc-bal">8,412</div>
+        <div class="wc-balance-sub">sats · ≈ $4.21 USD</div>
+        <div class="wc-actions">
+          <button class="wc-btn">Receive</button>
+          <button class="wc-btn">Send</button>
+          <button class="wc-btn primary">Top up</button>
+        </div>
+      </div>
+
+      <div class="sett-section">
+        <div class="sett-label">Bitcoin &amp; payments</div>
+        <div class="sett-row">
+          <div class="sett-row-left">
+            <div class="sett-icon" style="background:rgba(247,194,23,.1)">⚡</div>
+            <div>
+              <div class="sett-title">Lightning wallet</div>
+              <div class="sett-sub" id="wallet-sub">Connect to send sats to buzzes</div>
+            </div>
+          </div>
+          <div class="sett-right">
+            <div class="sett-badge coming" id="wallet-badge">Coming soon</div>
+          </div>
+        </div>
+        <div class="sett-row">
+          <div class="sett-row-left">
+            <div class="sett-icon" style="background:rgba(247,194,23,.08)">₿</div>
+            <div>
+              <div class="sett-title">Bitcoin wallet</div>
+              <div class="sett-sub">On-chain payments</div>
+            </div>
+          </div>
+          <div class="sett-right">
+            <div class="sett-badge coming">Coming soon</div>
+          </div>
+        </div>
+        <div class="sett-row">
+          <div class="sett-row-left">
+            <div class="sett-icon" style="background:rgba(85,239,196,.08)">💳</div>
+            <div>
+              <div class="sett-title">Apple Pay</div>
+              <div class="sett-sub">Pay with card or Apple Pay</div>
+            </div>
+          </div>
+          <div class="sett-right">
+            <div class="sett-badge coming">Coming soon</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sett-section">
+        <div class="sett-label">Account</div>
+        <div class="sett-row" id="sett-profile-row" style="cursor:pointer">
+          <div class="sett-row-left">
+            <div class="sett-icon" style="background:rgba(255,107,107,.12)">
+              <div class="ava" id="sett-ava" style="background:#ff6b6b;width:28px;height:28px;font-size:11px">YO</div>
+            </div>
+            <div>
+              <div class="sett-title">Your profile</div>
+              <div class="sett-sub">@you · 0 buzzes</div>
+            </div>
+          </div>
+          <div class="sett-right"><div class="sett-chevron">›</div></div>
+        </div>
+        <div class="sett-row">
+          <div class="sett-row-left">
+            <div class="sett-icon" style="background:rgba(116,185,255,.1)">🔔</div>
+            <div>
+              <div class="sett-title">Notifications</div>
+              <div class="sett-sub">When your buzz gets liked</div>
+            </div>
+          </div>
+          <div class="sett-right"><div class="sett-badge coming">Coming soon</div></div>
+        </div>
+        <div class="sett-row">
+          <div class="sett-row-left">
+            <div class="sett-icon" style="background:rgba(162,155,254,.1)">🔒</div>
+            <div>
+              <div class="sett-title">Privacy</div>
+              <div class="sett-sub">Control who sees your buzzes</div>
+            </div>
+          </div>
+          <div class="sett-right"><div class="sett-badge coming">Coming soon</div></div>
+        </div>
+      </div>
+
+      <div class="sett-section">
+        <div class="sett-label">About</div>
+        <div class="sett-row">
+          <div class="sett-row-left">
+            <div class="sett-icon" style="background:rgba(255,255,255,.06)">📄</div>
+            <div>
+              <div class="sett-title">White paper</div>
+              <div class="sett-sub">The 1Buzz vision</div>
+            </div>
+          </div>
+          <div class="sett-right"><div class="sett-chevron">›</div></div>
+        </div>
+        <div class="sett-row">
+          <div class="sett-row-left">
+            <div class="sett-icon" style="background:rgba(255,255,255,.06)">🌍</div>
+            <div>
+              <div class="sett-title">1buzz.app</div>
+              <div class="sett-sub">Version 0.1 — prototype</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="height:20px"></div>
+    </div>
+  </div>
+
+  <div id="pin-mode-overlay">
+    <div id="pin-mode-top">
+      <div id="pin-mode-cancel">Cancel</div>
+      <div id="pin-mode-label">Tap to place your buzz</div>
+      <div style="min-width:60px"></div>
+    </div>
+    <div id="pin-coords"></div>
+    <div id="pin-mode-bottom">
+      <div id="pin-mode-hint">Scroll and zoom to find your exact spot, then tap the map</div>
+      <button id="pin-confirm-btn">Drop buzz here ⚡</button>
+    </div>
+  </div>
+  <div id="crosshair">
+    <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="24" cy="24" r="10" stroke="#f7c217" stroke-width="2.5"/>
+      <line x1="24" y1="4" x2="24" y2="14" stroke="#f7c217" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="24" y1="34" x2="24" y2="44" stroke="#f7c217" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="4" y1="24" x2="14" y2="24" stroke="#f7c217" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="34" y1="24" x2="44" y2="24" stroke="#f7c217" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="24" cy="24" r="2.5" fill="#f7c217"/>
+    </svg>
+  </div>
+    <div id="locrow"><div class="locpin"></div><div id="loctext">Tap + to drop a buzz anywhere on Earth</div></div>
+    <div id="composer">
+      <div id="custbtn">🎨</div>
+      <textarea id="postinput" placeholder="What's buzzing...?" maxlength="140"></textarea>
+      <button id="zapbtn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M13 2L4.5 13.5H11L10 22L19.5 10.5H13L13 2Z" fill="#000" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div id="charlimit">0 / 140</div>
+  </div>
+
+  <div id="toast"></div>
+
+  <!-- ZAP SHEET -->
+  <div class="sheet-bg" id="zap-bg">
+    <div class="sheet" id="zap-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h3 id="zs-title">Zap</h3>
+        <div class="sh-close" id="zs-close">✕</div>
+      </div>
+      <div class="zauth" id="zs-auth">@handle</div>
+      <div class="zpreview" id="zs-content">...</div>
+      <div class="like-section">
+        <div id="like-big-btn">❤️</div>
+        <div id="like-count-display"><span id="lc-num">0</span> likes</div>
+        <div class="quick-likes">
+          <div class="ql-btn" data-n="5">+5</div>
+          <div class="ql-btn" data-n="10">+10</div>
+          <div class="ql-btn" data-n="50">+50</div>
+          <div class="ql-btn" data-n="100">+100</div>
+        </div>
+      </div>
+      <button id="close-zap-sheet">Done</button>
+    </div>
+  </div>
+
+  <!-- PROFILE SHEET -->
+  <div class="sheet-bg" id="profile-bg">
+    <div class="sheet" id="profile-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h3>Profile</h3>
+        <div class="sh-close" id="ps-close">✕</div>
+      </div>
+      <div class="profile-hero">
+        <div class="ph-row">
+          <div class="ph-ava" id="ph-ava" style="background:#ff6b6b">YO</div>
+        </div>
+        <div class="ph-name">Your Name</div>
+        <div class="ph-handle">@you · joined March 2026</div>
+        <div class="ph-stats">
+          <div class="ph-stat"><div class="ph-sv" id="ph-zaps">0</div><div class="ph-sl">buzzes</div></div>
+          <div class="ph-stat"><div class="ph-sv" id="ph-likes">0</div><div class="ph-sl">likes got</div></div>
+          <div class="ph-stat"><div class="ph-sv" id="ph-given">0</div><div class="ph-sl">likes given</div></div>
+          <div class="ph-stat"><div class="ph-sv">PA</div><div class="ph-sl">location</div></div>
+        </div>
+        <div class="install-banner">
+          <div class="ib-icon">📲</div>
+          <div>
+            <div class="ib-title">Add to Home Screen</div>
+            <div class="ib-sub">Tap Share → "Add to Home Screen" to install 1Buzz</div>
+          </div>
+        </div>
+        <div style="height:16px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUST SHEET -->
+  <div class="sheet-bg" id="cust-bg">
+    <div class="sheet" id="cust-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h3>Post</h3>
+        <div class="sh-close" id="cs-close">✕</div>
+      </div>
+      <div class="cust-body">
+        <div class="preview-wrap">
+          <div id="blive">
+            <div class="bpulse" id="bpulse"></div>
+            <div id="bli">💡</div>
+            <div id="blt">What's buzzing</div>
+            <div id="bls">❤️ 0</div>
+          </div>
+        </div>
+        <div class="clabel">Color</div>
+        <div class="cgrid" id="cgrid"></div>
+        <div class="clabel">Icon</div>
+        <div class="igrid" id="igrid"></div>
+        <button id="cs-save">Save style ⚡</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://uxpijpqcfxxcirpvylpa.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_9DJq3TXfzRRgZE5rclvwcw_grJG0PqO';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const POSTS=[];
+const COLORS=['#ff6b6b','#f7c217','#6c63ff','#4ecdc4','#55efc4','#fd79a8','#74b9ff','#e17055','#fdcb6e','#a29bfe','#00b894','#fff'];
+const ICONS=['💡','⚡','🔥','🌍','🎵','📍','🚀','🎭','☕','🌊','🏆','🎸','🎨','🐝','🌿','💬','⚽','🏮'];
+
+let selColor='#ff6b6b', selIcon='💡';
+let activeId=null, activePost=null;
+let likeTotal=0, zapCount=0;
+let dropLat=null, dropLng=null;
+let likesGiven=0, likesReceived=0, myZapCount=0;
+let map, markers={};
+let currentUser=null;
+let isGuest=false;
+
+function hexRgba(h,a){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return `rgba(${r},${g},${b},${a})`}
+function fmtLikes(n){if(n>=1000)return(Math.round(n/100)/10)+'K';return String(n)}
+function bubbleSize(likes){if(likes===0)return 24;return Math.min(78,Math.max(28,24+Math.log10(likes+1)*18))}
+
+function makeBubbleHTML(p){
+  const s=bubbleSize(p.likes);
+  return `<div class="zap-bubble" style="width:${s}px;height:${s}px;background:${hexRgba(p.color,.18)};border-color:${hexRgba(p.color,.38)}">
+    <div class="zpulse" style="border-color:${p.color}"></div>
+    <div class="zb-icon">${p.icon}</div>
+    ${s>46?`<div class="zb-text">${p.text}</div>`:''}
+    <div class="zb-likes">❤️${fmtLikes(p.likes)}</div>
+  </div>`;
+}
+
+function minLikesForZoom(zoom){
+  if(zoom<=3) return 500;
+  if(zoom<=5) return 100;
+  if(zoom<=7) return 20;
+  if(zoom<=10) return 5;
+  if(zoom<=13) return 1;
+  return 0;
+}
+
+function addOrUpdate(p){
+  if(markers[p.id]) map.removeLayer(markers[p.id]);
+  const zoom=map?map.getZoom():3;
+  if(p.likes < minLikesForZoom(zoom)){
+    markers[p.id]=null;
+    return;
+  }
+  const s=bubbleSize(p.likes);
+  const icon=L.divIcon({className:'',html:makeBubbleHTML(p),iconSize:[s,s],iconAnchor:[s/2,s/2]});
+  const m=L.marker([p.lat,p.lng],{icon,zIndexOffset:Math.floor(p.likes/10)});
+  m.on('click',()=>openZapSheet(p));
+  m.addTo(map);
+  markers[p.id]=m;
+}
+
+function refreshAllMarkers(){
+  POSTS.forEach(p=>addOrUpdate(p));
+}
+
+let globeInstance=null;
+let globeMode=true;
+let globeCanvas=null;
+
+function drawGlobeCanvas(){
+  const el=document.getElementById('globe-container');
+  const oldCanvas=el.querySelector('canvas');
+  if(oldCanvas&&oldCanvas._stopAnim) oldCanvas._stopAnim();
+  el.innerHTML='';
+  const W=el.offsetWidth||window.innerWidth;
+  const H=el.offsetHeight||window.innerHeight;
+  const canvas=document.createElement('canvas');
+  canvas.width=W; canvas.height=H;
+  canvas.style.cssText='position:absolute;inset:0;width:100%;height:100%';
+  el.appendChild(canvas);
+  const ctx=canvas.getContext('2d');
+  let rotY=0, isDragging=false, lastX=0, autoRot=true;
+  let animId=null;
+
+  const CONTINENTS=[
+    {lat:50,lng:-100,rx:28,ry:22,label:'N. America'},
+    {lat:0,lng:-60,rx:14,ry:18,label:'S. America'},
+    {lat:50,lng:15,rx:22,ry:16,label:'Europe'},
+    {lat:20,lng:25,rx:24,ry:20,label:'Africa'},
+    {lat:55,lng:90,rx:36,ry:18,label:'Asia'},
+    {lat:-25,lng:135,rx:18,ry:14,label:'Australia'},
+  ];
+
+  function project(lat,lng){
+    const la=lat*Math.PI/180;
+    const lo=(lng*Math.PI/180)+rotY;
+    const x=Math.cos(la)*Math.sin(lo);
+    const y=-Math.sin(la);
+    const z=Math.cos(la)*Math.cos(lo);
+    return {x,y,z};
+  }
+
+  function toScreen(lat,lng,cx,cy,r){
+    const p=project(lat,lng);
+    return {sx:cx+p.x*r, sy:cy+p.y*r, z:p.z};
+  }
+
+  function stars(ctx,W,H){
+    ctx.save();
+    for(let i=0;i<200;i++){
+      const x=(Math.sin(i*1234.5)*0.5+0.5)*W;
+      const y=(Math.cos(i*9876.5)*0.5+0.5)*H;
+      const s=i%3===0?1.2:0.5;
+      ctx.beginPath(); ctx.arc(x,y,s,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,255,255,${0.2+i%4*0.1})`; ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawFrame(){
+    const cx=W/2, cy=H/2, r=Math.min(W,H)*.36;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#06080f'; ctx.fillRect(0,0,W,H);
+    stars(ctx,W,H);
+
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.fillStyle='#0a1628'; ctx.fill();
+
+    for(let lat=-60;lat<=60;lat+=20){
+      const p0=toScreen(lat,-175,cx,cy,r);
+      if(p0.z<0) continue;
+      ctx.beginPath();
+      for(let lo=-175;lo<=175;lo+=5){
+        const p=toScreen(lat,lo,cx,cy,r);
+        lo===-175?ctx.moveTo(p.sx,p.sy):ctx.lineTo(p.sx,p.sy);
+      }
+      ctx.strokeStyle='rgba(55,138,221,.1)'; ctx.lineWidth=.5; ctx.stroke();
+    }
+    for(let lon=-150;lon<=150;lon+=30){
+      ctx.beginPath();
+      let started=false;
+      for(let la=-85;la<=85;la+=5){
+        const p=toScreen(la,lon,cx,cy,r);
+        if(p.z<0){started=false;continue;}
+        started?ctx.lineTo(p.sx,p.sy):(ctx.moveTo(p.sx,p.sy),started=true);
+      }
+      ctx.strokeStyle='rgba(55,138,221,.08)'; ctx.lineWidth=.5; ctx.stroke();
+    }
+
+    CONTINENTS.forEach(c=>{
+      const steps=24;
+      let visible=false;
+      ctx.beginPath();
+      for(let i=0;i<=steps;i++){
+        const a=(i/steps)*Math.PI*2;
+        const clat=c.lat+Math.sin(a)*c.ry;
+        const clng=c.lng+Math.cos(a)*c.rx;
+        const p=toScreen(clat,clng,cx,cy,r);
+        if(p.z>0) visible=true;
+        i===0?ctx.moveTo(p.sx,p.sy):ctx.lineTo(p.sx,p.sy);
+      }
+      if(visible){
+        ctx.fillStyle='#0f2d4a'; ctx.fill();
+        ctx.strokeStyle='rgba(55,138,221,.25)'; ctx.lineWidth=.8; ctx.stroke();
+      }
+    });
+
+    const glare=ctx.createRadialGradient(cx-r*.35,cy-r*.35,0,cx,cy,r);
+    glare.addColorStop(0,'rgba(80,140,255,.12)');
+    glare.addColorStop(.6,'transparent');
+    glare.addColorStop(1,'rgba(0,0,0,.4)');
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.fillStyle=glare; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.strokeStyle='rgba(55,138,221,.35)'; ctx.lineWidth=1.5; ctx.stroke();
+
+    POSTS.filter(p=>p.likes>0).forEach(p=>{
+      const pt=toScreen(p.lat,p.lng,cx,cy,r);
+      if(pt.z<0.1) return;
+      const s=Math.min(22,Math.max(5,4+Math.log10(p.likes+1)*7));
+      ctx.beginPath(); ctx.arc(pt.sx,pt.sy,s,0,Math.PI*2);
+      ctx.fillStyle=hexToRgba2(p.color,.3); ctx.fill();
+      ctx.strokeStyle=hexToRgba2(p.color,.8); ctx.lineWidth=1.5; ctx.stroke();
+      if(s>10){
+        ctx.fillStyle='#f7c217'; ctx.font=`bold 7px system-ui`;
+        ctx.textAlign='center'; ctx.fillText('❤'+p.likes,pt.sx,pt.sy+2);
+      }
+    });
+
+    if(autoRot) rotY+=.004;
+    animId=requestAnimationFrame(drawFrame);
+  }
+
+  canvas.addEventListener('touchstart',e=>{autoRot=false;isDragging=true;lastX=e.touches[0].clientX;},{passive:true});
+  canvas.addEventListener('touchmove',e=>{if(!isDragging)return;const dx=e.touches[0].clientX-lastX;rotY+=dx*.006;lastX=e.touches[0].clientX;},{passive:true});
+  canvas.addEventListener('touchend',()=>{isDragging=false;setTimeout(()=>autoRot=true,4000);});
+  canvas.addEventListener('mousedown',e=>{autoRot=false;isDragging=true;lastX=e.clientX;});
+  canvas.addEventListener('mousemove',e=>{if(!isDragging)return;rotY+=(e.clientX-lastX)*.006;lastX=e.clientX;});
+  canvas.addEventListener('mouseup',()=>{isDragging=false;setTimeout(()=>autoRot=true,4000);});
+  canvas._stopAnim=()=>cancelAnimationFrame(animId);
+  animId=requestAnimationFrame(drawFrame);
+
+  const zoomInBtn=document.createElement('button');
+  zoomInBtn.textContent='Explore the map \u2192';
+  zoomInBtn.style.cssText='position:absolute;bottom:130px;left:50%;transform:translateX(-50%);background:#f7c217;border:none;border-radius:22px;padding:12px 28px;font-size:15px;font-weight:700;color:#000;cursor:pointer;font-family:inherit;white-space:nowrap;z-index:5';
+  zoomInBtn.addEventListener('click',()=>setView('map'));
+  el.appendChild(zoomInBtn);
+}
+
+function hexToRgba2(hex,a){
+  if(hex==='#fff'||hex==='#ffffff') return `rgba(255,255,255,${a})`;
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function hexToRgb(hex){
+  if(hex==='#fff'||hex==='#ffffff') return '255,255,255';
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `${r},${g},${b}`;
+}
+
+function setView(mode){
+  globeMode=(mode==='globe');
+  const mapEl=document.getElementById('map');
+  const globeEl=document.getElementById('globe-container');
+  const tog=document.getElementById('globe-toggle');
+  if(tog) tog.checked=globeMode;
+  if(globeMode){
+    mapEl.style.display='none';
+    globeEl.style.display='block';
+    drawGlobeCanvas();
+  } else {
+    const canvas=globeEl.querySelector('canvas');
+    if(canvas&&canvas._stopAnim) canvas._stopAnim();
+    mapEl.style.display='block';
+    globeEl.style.display='none';
+    refreshAllMarkers();
+    map.invalidateSize();
+  }
+}
+
+document.getElementById('settings-btn').addEventListener('click',()=>{
+  document.getElementById('settings-bg').classList.add('open');
+  document.getElementById('settings-sheet').classList.add('open');
+});
+document.getElementById('sett-close').addEventListener('click',()=>{
+  document.getElementById('settings-bg').classList.remove('open');
+  document.getElementById('settings-sheet').classList.remove('open');
+});
+document.getElementById('settings-bg').addEventListener('click',function(e){
+  if(e.target===this){
+    document.getElementById('settings-bg').classList.remove('open');
+    document.getElementById('settings-sheet').classList.remove('open');
+  }
+});
+document.getElementById('sett-profile-row').addEventListener('click',()=>{
+  document.getElementById('settings-bg').classList.remove('open');
+  document.getElementById('settings-sheet').classList.remove('open');
+  document.getElementById('ph-zaps').textContent=myZapCount;
+  openSheet('profile');
+});
+
+function initMap(){
+  map=L.map('map',{zoomControl:false,attributionControl:true,minZoom:2,maxZoom:18,worldCopyJump:true}).setView([20,10],3);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains:'abcd', maxZoom:20
+  }).addTo(map);
+  POSTS.forEach(p=>addOrUpdate(p));
+  map.on('zoomend',function(){ refreshAllMarkers(); });
+  map.on('move',function(){ if(document.getElementById('pin-mode-overlay').classList.contains('active')){ const ct=map.getCenter(); dropLat=ct.lat; dropLng=ct.lng; document.getElementById('pin-coords').textContent='📍 '+dropLat.toFixed(4)+', '+dropLng.toFixed(4); } });
+  map.on('click',function(e){
+    if(document.getElementById('pin-mode-overlay').classList.contains('active')){
+      dropLat=e.latlng.lat; dropLng=e.latlng.lng;
+      document.getElementById('pin-coords').textContent='📍 '+dropLat.toFixed(4)+', '+dropLng.toFixed(4);
+      document.getElementById('pin-coords').classList.add('visible');
+      document.getElementById('pin-mode-hint').textContent='Looking good! Hit the button to drop your buzz here.';
+      document.getElementById('pin-confirm-btn').classList.add('visible');
+      return;
+    }
+    dropLat=e.latlng.lat; dropLng=e.latlng.lng;
+    document.getElementById('loctext').textContent='Pinned: '+dropLat.toFixed(2)+', '+dropLng.toFixed(2);
+  });
+}
+
+function openZapSheet(p){
+  document.getElementById('zs-title').textContent=p.icon+' '+p.text;
+  document.getElementById('zs-auth').textContent=p.handle+' · '+p.likes+' Buzz';
+  var bHtml=p.body?'<div style="font-size:14px;color:rgba(255,255,255,.7);line-height:1.6;padding:0 20px 8px">'+p.body+'</div>':''; var tStr=p.created_at?'<div style="font-size:11px;color:rgba(255,255,255,.25);padding:0 20px 8px">'+new Date(p.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</div>':''; document.getElementById('zs-content').innerHTML=bHtml+tStr;
+  document.getElementById('lc-num').textContent=p.likes;
+}
+
+async function addLikes(n){
+  const p=POSTS.find(x=>x.id===activeId);
+  if(!p)return;
+  p.likes+=n; likeTotal+=n; likesGiven+=n;
+  addOrUpdate(p);
+  document.getElementById('lc-num').textContent=p.likes;
+  document.getElementById('zs-auth').textContent=p.handle+' · ❤️ '+p.likes+' likes';
+  document.getElementById('s-likes').textContent=likeTotal>=1000?Math.round(likeTotal/1000)+'K':likeTotal;
+  document.getElementById('ph-given').textContent=likesGiven;
+  if(p.handle==='@you'||p.user_id===currentUser?.id){
+    likesReceived+=n;
+    document.getElementById('ph-likes').textContent=likesReceived;
+  }
+  animLikeBtn();
+  await saveLike(p.id);
+}
+
+function animLikeBtn(){
+  const b=document.getElementById('like-big-btn');
+  b.style.transform='scale(.82)';
+  setTimeout(()=>b.style.transform='scale(1)',130);
+}
+
+document.getElementById('like-big-btn').addEventListener('click',()=>addLikes(1));
+document.querySelectorAll('.ql-btn').forEach(b=>b.addEventListener('click',function(){addLikes(parseInt(this.dataset.n))}));
+
+function openSheet(name){
+  document.getElementById(name+'-bg').classList.add('open');
+  document.getElementById(name+'-sheet').classList.add('open');
+}
+function closeSheet(name){
+  document.getElementById(name+'-bg').classList.remove('open');
+  document.getElementById(name+'-sheet').classList.remove('open');
+}
+
+['zs-close','close-zap-sheet'].forEach(id=>document.getElementById(id).addEventListener('click',()=>closeSheet('zap')));
+document.getElementById('zap-bg').addEventListener('click',e=>{if(e.target===document.getElementById('zap-bg'))closeSheet('zap')});
+document.getElementById('ps-close').addEventListener('click',()=>closeSheet('profile'));
+document.getElementById('profile-bg').addEventListener('click',e=>{if(e.target===document.getElementById('profile-bg'))closeSheet('profile')});
+document.getElementById('cs-close').addEventListener('click',()=>closeSheet('cust'));
+document.getElementById('cust-bg').addEventListener('click',e=>{if(e.target===document.getElementById('cust-bg'))closeSheet('cust')});
+
+document.getElementById('userpill').addEventListener('click',()=>{
+  document.getElementById('ph-zaps').textContent=myZapCount;
+  openSheet('profile');
+});
+document.getElementById('custbtn').addEventListener('click',()=>openSheet('cust'));
+
+const CS_COLORS=['#ff6b6b','#f7c217','#6c63ff','#4ecdc4','#55efc4','#fd79a8','#74b9ff','#e17055','#fdcb6e','#a29bfe','#00b894','#fff'];
+const CS_ICONS=['💡','⚡','🔥','🌍','🎵','📍','🚀','🎭','☕','🌊','🏆','🎸','🎨','🐝','🌿','💬','⚽','🏮'];
+const CS_EMOJIS=['😂','❤️','🔥','👀','💯','🙌','✨','🎉','💪','🌟','😍','🤯','👏','💥','🎯','🙏','😎','🤝'];
+
+let csSelColor=selColor, csSelIcon=selIcon;
+
+function buildCSColorRow(){
+  const r=document.getElementById('cs-color-row'); r.innerHTML='';
+  CS_COLORS.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='cs-cdot'+(c===csSelColor?' sel':'');
+    d.style.background=c;
+    d.addEventListener('click',()=>{
+      csSelColor=c; selColor=c;
+      document.querySelectorAll('.cs-cdot').forEach(x=>x.classList.remove('sel'));
+      d.classList.add('sel');
+      updateCSPreview();
+      document.getElementById('cs-ava').style.background=c;
+    });
+    r.appendChild(d);
+  });
+}
+
+function buildCSIconRow(){
+  const r=document.getElementById('cs-icon-row'); r.innerHTML='';
+  CS_ICONS.forEach(ic=>{
+    const d=document.createElement('div');
+    d.className='cs-iopt'+(ic===csSelIcon?' sel':'');
+    d.textContent=ic;
+    d.addEventListener('click',()=>{
+      csSelIcon=ic; selIcon=ic;
+      document.querySelectorAll('.cs-iopt').forEach(x=>x.classList.remove('sel'));
+      d.classList.add('sel');
+      updateCSPreview();
+    });
+    r.appendChild(d);
+  });
+}
+
+function buildCSEmojiRow(){
+  const r=document.getElementById('cs-emoji-row'); r.innerHTML='';
+  CS_EMOJIS.forEach(em=>{
+    const d=document.createElement('div');
+    d.className='cs-emoji'; d.textContent=em;
+    d.addEventListener('click',()=>{
+      const ta=document.getElementById('cs-body-text');
+      if(ta.value.length<498){ta.value+=em; ta.dispatchEvent(new Event('input'));}
+    });
+    r.appendChild(d);
+  });
+}
+
+function hexRgbaCS(h,a){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return `rgba(${r},${g},${b},${a})`;}
+
+function updateCSPreview(){
+  const bp=document.getElementById('cs-bubble-preview');
+  bp.style.background=hexRgbaCS(csSelColor,.18);
+  bp.style.borderColor=hexRgbaCS(csSelColor,.4);
+  const tag=document.getElementById('cs-tagline').value||'What\'s buzzing?';
+  document.getElementById('cs-preview-tag').textContent=tag.slice(0,20)+(tag.length>20?'…':'');
+  document.getElementById('cs-prev-tagline').textContent=tag||'Your tagline appears here';
+}
+
+function openCompose(){
+  document.getElementById('cs-loc-text').textContent=
+    dropLat?'📍 '+dropLat.toFixed(3)+', '+dropLng.toFixed(3):'Tap map to pin · or uses current view';
+  csSelColor=selColor; csSelIcon=selIcon;
+  buildCSColorRow(); buildCSIconRow(); buildCSEmojiRow();
+  updateCSPreview();
+  document.getElementById('cs-post-btn').disabled=true;
+  document.getElementById('compose-screen').classList.add('open');
+  setTimeout(()=>document.getElementById('cs-tagline').focus(),350);
+}
+
+function closeCompose(){
+  document.getElementById('compose-screen').classList.remove('open');
+  document.getElementById('cs-tagline').blur();
+  document.getElementById('cs-body-text').blur();
+  setTimeout(()=>{ if(map) map.invalidateSize(); }, 350);
+}
+
+document.getElementById('addbtn').addEventListener('click',openCompose);
+document.getElementById('cs-cancel').addEventListener('click',closeCompose);
+
+document.getElementById('cs-tagline').addEventListener('input',function(){
+  const len=this.value.length;
+  document.getElementById('cs-taglimit').textContent=len+'/60';
+  document.getElementById('cs-taglimit').style.color=len>50?'#ff6b6b':'rgba(255,255,255,.25)';
+  document.getElementById('cs-post-btn').disabled=len===0;
+  updateCSPreview();
+});
+
+document.querySelectorAll('.cs-social-btn').forEach(btn=>{
+  btn.addEventListener('click',function(){
+    this.classList.toggle('linked');
+    showToast(this.classList.contains('linked')?'Linked! ✓':'Unlinked');
+  });
+});
+
+let pendingPost = null;
+let viewBeforePin = 'globe';
+
+function enterPinMode(post){
+  pendingPost = post;
+  viewBeforePin = globeMode ? 'globe' : 'map';
+  if(globeMode) setView('map');
+  document.getElementById('pin-mode-overlay').classList.add('active');
+  document.getElementById('crosshair').classList.add('active');
+  const _c=map.getCenter(); dropLat=_c.lat; dropLng=_c.lng;
+  document.getElementById('pin-mode-hint').textContent='Pan the map 2014 bubble drops at the crosshair center';
+  document.getElementById('pin-coords').textContent='📍 '+dropLat.toFixed(4)+', '+dropLng.toFixed(4);
+  document.getElementById('pin-coords').classList.add('visible');
+  document.getElementById('pin-confirm-btn').classList.add('visible');
+
+function exitPinMode(){
+  pendingPost=null;
+  document.getElementById('pin-mode-overlay').classList.remove('active');
+  document.getElementById('crosshair').classList.remove('active');
+  document.getElementById('pin-confirm-btn').classList.remove('visible');
+  document.getElementById('pin-coords').classList.remove('visible');
+  map.getContainer().style.cursor='';
+  dropLat=null; dropLng=null;
+  setTimeout(()=>{ if(map) map.invalidateSize(); }, 100);
+}
+
+document.getElementById('pin-mode-cancel').addEventListener('click',()=>{
+  exitPinMode();
+  showToast('Post cancelled');
+});
+
+document.getElementById('pin-confirm-btn').addEventListener('click',async()=>{
+  if(!pendingPost||dropLat===null) return;
+  pendingPost.lat=dropLat;
+  pendingPost.lng=dropLng;
+  document.getElementById('pin-confirm-btn').textContent='Saving...';
+  const saved=await savePost(pendingPost);
+  if(saved){
+    const p={id:saved.id,lat:saved.lat,lng:saved.lng,text:saved.tagline,handle:'@'+(saved.handle||'anon'),likes:0,color:saved.color||'#ff6b6b',icon:saved.icon||'💡'};
+    POSTS.push(p); zapCount++; myZapCount++;
+    addOrUpdate(p);
+    document.getElementById('s-zaps').textContent=zapCount;
+    document.getElementById('ph-zaps').textContent=myZapCount;
+    const lat=dropLat, lng=dropLng;
+    exitPinMode();
+    showToast('Buzz dropped! ⚡');
+    map.flyTo([lat,lng],14,{duration:1.4});
+  } else {
+    document.getElementById('pin-confirm-btn').textContent='Drop buzz here ⚡';
+  }
+});
+
+document.getElementById('cs-post-btn').addEventListener('click',async()=>{
+  const txt=document.getElementById('cs-tagline').value.trim();
+  if(!txt){showToast('Add a tagline first!');return;}
+  if(isGuest){showToast('Sign in to drop a Buzz!');return;}
+  const body=document.getElementById('cs-body-text').value.trim();
+  const link=document.getElementById('cs-link-input').value.trim();
+  document.getElementById('cs-post-btn').disabled=true;
+  document.getElementById('cs-post-btn').textContent='Posting...';
+  const name=currentUser?(currentUser.user_metadata?.name||currentUser.email.split('@')[0]):'anon';
+  const pendingData={id:'temp_'+Date.now(),lat:0,lng:0,text:txt,body,link,handle:'@'+name.toLowerCase().replace(/\s+/g,''),likes:0,color:csSelColor,icon:csSelIcon};
+  document.getElementById('cs-tagline').value='';
+  document.getElementById('cs-body-text').value='';
+  document.getElementById('cs-link-input').value='';
+  document.getElementById('cs-taglimit').textContent='0/60';
+  document.getElementById('cs-post-btn').textContent='Post';
+  closeCompose();
+  pendingPost=pendingData;
+  setTimeout(()=>enterPinMode(pendingData),350);
+});
+
+document.getElementById('zapbtn').addEventListener('click',()=>{
+  const txt=document.getElementById('postinput').value.trim();
+  if(!txt){showToast('Write something first!');return;}
+  const lat=dropLat||(36+Math.random()*2-1);
+  const lng=dropLng||(-80+Math.random()*2-1);
+  const np={id:Date.now(),lat,lng,text:txt,handle:'@you',likes:0,color:selColor,icon:selIcon};
+  POSTS.push(np); myZapCount++;
+  addOrUpdate(np); zapCount++;
+  document.getElementById('postinput').value='';
+  document.getElementById('charlimit').textContent='0 / 140';
+  document.getElementById('loctext').textContent='Be the first to buzz! Tap the map to pin a location.';
+  dropLat=null; dropLng=null;
+  document.getElementById('s-zaps').textContent=zapCount.toLocaleString();
+  document.getElementById('ph-zaps').textContent=myZapCount;
+  showToast('Buzz dropped! ⚡');
+  map.flyTo([lat,lng],12,{duration:1.4});
+});
+
+document.getElementById('postinput').addEventListener('input',function(){
+  document.getElementById('charlimit').textContent=this.value.length+' / 140';
+});
+
+document.querySelectorAll('.tpill').forEach(pill=>{
+  pill.addEventListener('click',function(){
+    document.querySelectorAll('.tpill').forEach(p=>p.classList.remove('active'));
+    this.classList.add('active');
+    if(this.dataset.lat) map.flyTo([parseFloat(this.dataset.lat),parseFloat(this.dataset.lng)],parseInt(this.dataset.zoom),{duration:1.5});
+    else map.flyTo([20,10],3,{duration:1.8});
+  });
+});
+
+document.getElementById('nearme-pill').addEventListener('click',function(){
+  document.querySelectorAll('.tpill').forEach(p=>p.classList.remove('active'));
+  this.classList.add('active');
+  this.textContent='📍 Locating...';
+  if(!navigator.geolocation){
+    showToast('Location not supported on this device');
+    this.textContent='📍 Near me';
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      const lat=pos.coords.latitude, lng=pos.coords.longitude;
+      map.flyTo([lat,lng],14,{duration:1.5});
+      showToast('📍 Showing your location');
+      this.textContent='📍 Near me';
+    },
+    err=>{
+      showToast('Location access denied');
+      this.textContent='📍 Near me';
+      document.querySelectorAll('.tpill').forEach(p=>p.classList.remove('active'));
+    },
+    {timeout:8000, enableHighAccuracy:true}
+  );
+});
+
+function buildCust(){
+  const cg=document.getElementById('cgrid');
+  COLORS.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='cdot'+(c===selColor?' sel':'');
+    d.style.background=c;
+    d.addEventListener('click',()=>{
+      selColor=c;
+      document.querySelectorAll('.cdot').forEach(x=>x.classList.remove('sel'));
+      d.classList.add('sel');
+      updatePreview();
+    });
+    cg.appendChild(d);
+  });
+  const ig=document.getElementById('igrid');
+  ICONS.forEach(ic=>{
+    const d=document.createElement('div');
+    d.className='iopt'+(ic===selIcon?' sel':'');
+    d.textContent=ic;
+    d.addEventListener('click',()=>{
+      selIcon=ic;
+      document.querySelectorAll('.iopt').forEach(x=>x.classList.remove('sel'));
+      d.classList.add('sel');
+      updatePreview();
+    });
+    ig.appendChild(d);
+  });
+}
+
+function updatePreview(){
+  const bl=document.getElementById('blive');
+  bl.style.background=hexRgba(selColor,.18);
+  bl.style.borderColor=hexRgba(selColor,.42);
+  document.getElementById('bpulse').style.borderColor=selColor;
+  document.getElementById('bli').textContent=selIcon;
+  document.getElementById('topava').style.background=selColor;
+  document.getElementById('ph-ava').style.background=selColor;
+  document.getElementById('sett-ava').style.background=selColor;
+}
+
+document.getElementById('cs-save').addEventListener('click',()=>{
+  closeSheet('cust');
+  showToast('Bubble style saved!');
+});
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  clearTimeout(window._tt);
+  window._tt=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+async function loadPosts(){
+  const{data,error}=await sb.from('buzzes').select('*').order('created_at',{ascending:false}).limit(200);
+  if(error){console.error('Load error',error);return;}
+  POSTS.length=0;
+  (data||[]).forEach(row=>{
+    const p={
+      id:row.id, lat:row.lat, lng:row.lng,
+      text:row.tagline, body:row.body||'',
+      handle:'@'+(row.handle||'anon'),
+      likes:row.likes||0,
+      color:row.color||'#ff6b6b',
+      icon:row.icon||'💡',
+      user_id:row.user_id, created_at:row.created_at
+    };
+    POSTS.push(p);
+    addOrUpdate(p);
+  });
+  zapCount=POSTS.length;
+  likeTotal=POSTS.reduce((a,p)=>a+p.likes,0);
+  document.getElementById('s-zaps').textContent=zapCount;
+  document.getElementById('s-likes').textContent=likeTotal>=1000?Math.round(likeTotal/1000)+'K':likeTotal;
+}
+
+async function savePost(post){
+  const{data,error}=await sb.from('buzzes').insert({
+    lat:post.lat, lng:post.lng,
+    tagline:post.text, body:post.body||'',
+    handle:currentUser?(currentUser.user_metadata?.name||currentUser.email.split('@')[0]):'anon',
+    color:post.color, icon:post.icon,
+    likes:0,
+    user_id:currentUser?currentUser.id:null
+  }).select().single();
+  if(error){console.error('Save error',error);showToast('Could not save buzz — try again');return null;}
+  return data;
+}
+
+async function saveLike(postId){
+  const{error}=await sb.rpc('increment_likes',{buzz_id:postId});
+  if(error){console.error('Like error',error);return;}
+  // Fetch the fresh like count from DB and sync locally
+  const{data}=await sb.from('buzzes').select('likes').eq('id',postId).single();
+  if(data){
+    const p=POSTS.find(x=>x.id===postId);
+    if(p){
+      p.likes=data.likes;
+      addOrUpdate(p);
+      likeTotal=POSTS.reduce((a,b)=>a+b.likes,0);
+      document.getElementById('s-likes').textContent=likeTotal>=1000?Math.round(likeTotal/1000)+'K':likeTotal;
+      if(activeId===postId){
+        document.getElementById('lc-num').textContent=p.likes;
+        document.getElementById('zs-auth').textContent=p.handle+' · '+p.likes+' Buzz';
+      }
+    }
+  }
+}
+
+function subscribeRealtime(){
+  sb.channel('buzzes-changes')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'buzzes'},payload=>{
+      const row=payload.new;
+      const exists=POSTS.find(p=>p.id===row.id);
+      if(exists) return;
+      const p={id:row.id,lat:row.lat,lng:row.lng,text:row.tagline,body:row.body||'',handle:'@'+(row.handle||'anon'),likes:row.likes||0,color:row.color||'#ff6b6b',icon:row.icon||'💡',user_id:row.user_id,created_at:row.created_at};
+      POSTS.push(p); addOrUpdate(p);
+      zapCount++; document.getElementById('s-zaps').textContent=zapCount;
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'buzzes'},payload=>{
+      const row=payload.new;
+      const p=POSTS.find(x=>x.id===row.id);
+      if(!p) return;
+      p.likes=row.likes||0;
+      addOrUpdate(p);
+      likeTotal=POSTS.reduce((a,b)=>a+b.likes,0);
+      document.getElementById('s-likes').textContent=likeTotal>=1000?Math.round(likeTotal/1000)+'K':likeTotal;
+      if(activeId===row.id){
+        document.getElementById('lc-num').textContent=p.likes;
+        document.getElementById('zs-auth').textContent=p.handle+' · '+p.likes+' Buzz';
+      }
+    })
+    .subscribe();
+}
+
+function updateUserUI(){
+  if(currentUser){
+    const name=currentUser.user_metadata?.name||currentUser.email.split('@')[0];
+    const handle=name.toLowerCase().replace(/\s+/g,'');
+    document.getElementById('topava').textContent=name.charAt(0).toUpperCase();
+    const pill=document.querySelector('#userpill span');
+    if(pill) pill.textContent='@'+handle;
+    document.querySelector('.ph-name').textContent=name;
+    document.querySelector('.ph-handle').textContent='@'+handle+' · 1Buzz member';
+    document.getElementById('cs-username').textContent='@'+handle;
+  } else {
+    document.getElementById('topava').textContent='?';
+    const pill=document.querySelector('#userpill span');
+    if(pill) pill.textContent='Guest';
+  }
+}
+
+async function initAuth(){
+  const{data:{session}}=await sb.auth.getSession();
+  if(session){
+    currentUser=session.user;
+    updateUserUI();
+    hideLanding();
+  } else {
+    document.getElementById('loading-screen').style.display='none';
+    document.getElementById('auth-screen').classList.add('show');
+  }
+  sb.auth.onAuthStateChange((_,session)=>{
+    currentUser=session?session.user:null;
+    if(currentUser) updateUserUI();
+  });
+}
+
+function hideLanding(){
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('auth-screen').classList.remove('show');
+}
+
+let authMode='signup';
+
+document.getElementById('auth-toggle').addEventListener('click',()=>{
+  authMode=authMode==='signup'?'signin':'signup';
+  const nameEl=document.getElementById('auth-name');
+  const titleEl=document.getElementById('auth-title');
+  const btnEl=document.getElementById('auth-submit-btn');
+  const toggleEl=document.getElementById('auth-toggle');
+  document.getElementById('auth-error').textContent='';
+  if(authMode==='signin'){
+    nameEl.style.display='none';
+    titleEl.textContent='Welcome back';
+    btnEl.textContent='Sign in ⚡';
+    toggleEl.innerHTML='New to 1Buzz? <span>Create account</span>';
+  } else {
+    nameEl.style.display='block';
+    titleEl.textContent='Create your account';
+    btnEl.textContent='Create account ⚡';
+    toggleEl.innerHTML='Already have an account? <span>Sign in</span>';
+  }
+});
+
+document.getElementById('auth-submit-btn').addEventListener('click',async()=>{
+  const email=document.getElementById('auth-email').value.trim();
+  const password=document.getElementById('auth-password').value.trim();
+  const name=document.getElementById('auth-name').value.trim();
+  const errEl=document.getElementById('auth-error');
+  errEl.textContent='';
+  if(!email||!password){errEl.textContent='Please fill in all fields.';return;}
+  if(authMode==='signup'&&!name){errEl.textContent='Please enter your name.';return;}
+  if(password.length<6){errEl.textContent='Password must be at least 6 characters.';return;}
+  document.getElementById('auth-submit-btn').textContent='...';
+  if(authMode==='signup'){
+    const{data,error}=await sb.auth.signUp({email,password,options:{data:{name}}});
+    if(error){errEl.textContent=error.message;document.getElementById('auth-submit-btn').textContent='Create account ⚡';return;}
+    if(data.user&&!data.session){
+      errEl.style.color='#55efc4';
+      errEl.textContent='Check your email to confirm your account!';
+      document.getElementById('auth-submit-btn').textContent='Create account ⚡';
+      return;
+    }
+    currentUser=data.user;
+  } else {
+    const{data,error}=await sb.auth.signInWithPassword({email,password});
+    if(error){errEl.textContent='Incorrect email or password.';document.getElementById('auth-submit-btn').textContent='Sign in ⚡';return;}
+    currentUser=data.user;
+  }
+  updateUserUI();
+  hideLanding();
+  startApp();
+});
+
+document.getElementById('google-btn').addEventListener('click',async()=>{
+  await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.href}});
+});
+
+document.getElementById('skip-btn').addEventListener('click',()=>{
+  isGuest=true;
+  hideLanding();
+  startApp();
+});
+
+async function startApp(){
+  buildCust();
+  updatePreview();
+  initMap();
+  await loadPosts();
+  subscribeRealtime();
+  if(currentUser) updateUserUI();
+}
+
+// SEARCH
+let searchTimer=null;
+const searchBtn=document.getElementById('search-btn');
+const searchBar=document.getElementById('searchbar');
+const searchInput=document.getElementById('search-input');
+const searchResults=document.getElementById('search-results');
+const searchClear=document.getElementById('search-clear');
+
+searchBtn.addEventListener('click',()=>{
+  const isOpen=searchBar.classList.contains('open');
+  if(isOpen){ closeSearch(); }
+  else { searchBar.classList.add('open'); searchBtn.textContent='✕'; setTimeout(()=>searchInput.focus(),100); }
+});
+
+function closeSearch(){
+  searchBar.classList.remove('open');
+  searchBtn.textContent='🔍';
+  searchInput.value='';
+  searchResults.classList.remove('show');
+  searchResults.innerHTML='';
+  searchClear.classList.remove('show');
+}
+
+searchClear.addEventListener('click',()=>{
+  searchInput.value=''; searchResults.classList.remove('show');
+  searchResults.innerHTML=''; searchClear.classList.remove('show'); searchInput.focus();
+});
+
+searchInput.addEventListener('input',function(){
+  const q=this.value.trim();
+  searchClear.classList.toggle('show',q.length>0);
+  clearTimeout(searchTimer);
+  if(q.length<2){searchResults.classList.remove('show');searchResults.innerHTML='';return;}
+  searchTimer=setTimeout(()=>doSearch(q),400);
+});
+
+searchInput.addEventListener('keydown',function(e){
+  if(e.key==='Enter'){clearTimeout(searchTimer);doSearch(this.value.trim());}
+  if(e.key==='Escape') closeSearch();
+});
+
+async function doSearch(q){
+  if(!q) return;
+  searchResults.innerHTML='<div class="sr-item"><div class="sr-icon">⏳</div><div><div class="sr-name">Searching...</div></div></div>';
+  searchResults.classList.add('show');
+  try{
+    const res=await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=5&addressdetails=1',{headers:{'Accept-Language':'en'}});
+    const data=await res.json();
+    if(!data||data.length===0){
+      searchResults.innerHTML='<div class="sr-item"><div class="sr-icon">🌍</div><div><div class="sr-name">No results found</div><div class="sr-sub">Try a different search</div></div></div>';
+      return;
+    }
+    searchResults.innerHTML=data.map(r=>{
+      const t=r.type||r.class||'';
+      const icon=t==='city'||t==='town'?'🏙':t==='country'?'🌍':t==='restaurant'||t==='cafe'?'🍽':t==='street'||t==='road'?'🛣':'📍';
+      const name=r.display_name.split(',')[0];
+      const sub=r.display_name.split(',').slice(1,3).join(',').trim();
+      return '<div class="sr-item" data-lat="'+r.lat+'" data-lng="'+r.lon+'" data-name="'+name+'"><div class="sr-icon">'+icon+'</div><div><div class="sr-name">'+name+'</div><div class="sr-sub">'+sub+'</div></div></div>';
+    }).join('');
+    searchResults.querySelectorAll('.sr-item').forEach(el=>{
+      el.addEventListener('click',()=>{
+        const lat=parseFloat(el.dataset.lat), lng=parseFloat(el.dataset.lng);
+        map.flyTo([lat,lng],13,{duration:1.5});
+        showToast('📍 '+el.dataset.name);
+        closeSearch();
+      });
+    });
+  } catch(e){
+    searchResults.innerHTML='<div class="sr-item"><div class="sr-icon">⚠️</div><div><div class="sr-name">Search unavailable</div><div class="sr-sub">Check your connection</div></div></div>';
+  }
+}
+
+buildCust();
+updatePreview();
+initMap();
+
+initAuth().then(async()=>{
+  if(currentUser||isGuest){
+    await loadPosts();
+    subscribeRealtime();
+  } else {
+    document.getElementById('google-btn').addEventListener('click',async()=>{
+      const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.href}});
+      if(error) showToast('Sign in failed — try again');
+    });
+  }
+  await loadPosts();
+  subscribeRealtime();
+});
+</script>
+</body>
+</html>
