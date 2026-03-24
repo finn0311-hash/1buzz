@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="SatZap">
+<meta name="apple-mobile-web-app-title" content="1Buzz">
 <meta name="theme-color" content="#06080f">
-<meta name="description" content="See what's zapping on Earth">
-<title>SatZap</title>
+<meta name="description" content="See what's buzzing on Earth">
+<title>1Buzz</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
@@ -138,8 +138,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,san
   <div id="topbar">
     <div id="topbar-inner">
       <div>
-        <div id="logo">Sat<span>Zap</span></div>
-        <div class="tagline">See what's zapping on Earth</div>
+        <div id="logo">1<span>Buzz</span></div>
+        <div class="tagline">See what's buzzing on Earth</div>
       </div>
       <div id="userpill"><div class="ava" id="topava" style="background:#ff6b6b">YO</div><span>@you</span></div>
     </div>
@@ -166,7 +166,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,san
     <div id="locrow"><div class="locpin"></div><div id="loctext">Tap map to pin · zap anywhere</div></div>
     <div id="composer">
       <div id="custbtn">🎨</div>
-      <textarea id="postinput" placeholder="What's zapping...?" maxlength="140"></textarea>
+      <textarea id="postinput" placeholder="What's buzzing...?" maxlength="140"></textarea>
       <button id="zapbtn">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M13 2L4.5 13.5H11L10 22L19.5 10.5H13L13 2Z" fill="#000" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/></svg>
       </button>
@@ -225,7 +225,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,san
           <div class="ib-icon">📲</div>
           <div>
             <div class="ib-title">Add to Home Screen</div>
-            <div class="ib-sub">Tap Share → "Add to Home Screen" to install SatZap</div>
+            <div class="ib-sub">Tap Share → "Add to Home Screen" to install 1Buzz</div>
           </div>
         </div>
         <div class="clabel" style="padding:0 20px 10px">Your zaps</div>
@@ -249,7 +249,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,san
           <div id="blive">
             <div class="bpulse" id="bpulse"></div>
             <div id="bli">💡</div>
-            <div id="blt">What's zapping</div>
+            <div id="blt">What's buzzing</div>
             <div id="bls">❤️ 0</div>
           </div>
         </div>
@@ -397,7 +397,7 @@ document.getElementById('zapbtn').addEventListener('click',()=>{
   dropLat=null; dropLng=null;
   document.getElementById('s-zaps').textContent=zapCount.toLocaleString();
   document.getElementById('ph-zaps').textContent=myZapCount;
-  showToast('Zap dropped! ⚡');
+  showToast('Buzz dropped! ⚡');
   map.flyTo([lat,lng],12,{duration:1.4});
 });
 
